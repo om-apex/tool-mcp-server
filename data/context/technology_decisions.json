@@ -1,0 +1,77 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-01-19",
+  "source": "Om_Apex_Master_Decision_Log_v1.1.docx",
+
+  "decisions": [
+    {
+      "id": "TECH-001",
+      "area": "Marketing Platform",
+      "date_decided": "2026-01-18",
+      "confidence": "High",
+      "notes": "All three AI advisors agreed"
+    },
+    {
+      "id": "TECH-002",
+      "area": "Full-Stack Framework",
+      "date_decided": "2026-01-18",
+      "confidence": "High",
+      "decision": {
+        "frontend": {
+          "framework": "Next.js 15",
+          "styling": "Tailwind + Shadcn UI",
+          "hosting": "Vercel",
+          "features": ["Real-time dashboards", "Warehouse map", "Mobile responsive"]
+        },
+        "backend": {
+          "language": "Python",
+          "framework": "FastAPI",
+          "hosting": "Render",
+          "ai_components": ["LangGraph agents", "MCP server", "Claude API"]
+        },
+        "database": {
+          "primary": "Supabase (Postgres)",
+          "features": ["Row Level Security", "Realtime", "Multi-tenant data isolation"],
+          "scaling_path": "Supabase → Citus (horizontal sharding) or CockroachDB for global scale"
+        }
+      },
+      "rationale": "Gemini's key insight about Python for AI agents"
+    },
+    {
+      "id": "TECH-003",
+      "area": "AI Agent Framework",
+      "date_decided": "2026-01-18",
+      "confidence": "High",
+      "decision": "LangGraph",
+      "use_cases": [
+        "Self-healing agent (analyze logs → suggest fixes → apply with approval)",
+        "Optimization agent (reorder points, picking routes)",
+        "Integration agent (scout APIs, generate code)"
+      ],
+      "rationale": "Gemini recommended, Grok agreed"
+    },
+    {
+      "id": "TECH-004",
+      "area": "Database",
+      "date_decided": "2026-01-18",
+      "confidence": "High",
+      "decision": "Supabase (Postgres)"
+    },
+    {
+      "id": "TECH-005",
+      "area": "Static Sites",
+      "date_decided": "2026-01-18",
+      "confidence": "High",
+      "applies_to": ["Om Apex website", "Om Luxe promo site"]
+    }
+  ],
+
+  "architecture_diagram": {
+    "description": "Three-tier architecture with clear separation",
+    "tiers": [
+      "FRONTEND (Vercel) - Next.js 15 + Tailwind + Shadcn UI",
+      "BACKEND (Render) - Python + FastAPI + LangGraph + MCP + Claude API",
+      "DATABASE (Supabase) - Postgres + RLS + Realtime"
+    ]
+  }
+}

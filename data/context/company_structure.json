@@ -1,0 +1,97 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-01-19",
+  "source": "Om_Apex_Master_Decision_Log_v1.1.docx",
+
+  "holding_company": {
+    "name": "Om Apex Holdings LLC",
+    "purpose": "Parent holding company that owns both operating subsidiaries. Provides liability isolation, enables future fundraising flexibility, and creates clean corporate structure for potential exits.",
+    "ownership": {
+      "nishad_tambe": "50%",
+      "sumedha_tambe": "50%"
+    },
+    "domain": "omapex.com"
+  },
+
+  "subsidiaries": [
+    {
+      "name": "Om Luxe Properties LLC",
+      "purpose": "Own and operate luxury vacation rental properties",
+      "domain": "omluxeproperties.com",
+      "current_status": "Operating - not yet break-even",
+      "current_property": {
+        "name": "Perch in the Clouds",
+        "location": "Ellijay, GA",
+        "management": "Home Team Luxury Rentals (HTLR)",
+        "commission": "22%",
+        "started": "August 2025"
+      },
+      "short_term_goal": "Improve occupancy and revenue to generate passive income that can help fund Om AI Solutions development"
+    },
+    {
+      "name": "Om AI Solutions LLC",
+      "purpose": "Provide AI-powered solutions for supply chain businesses, with focus on warehouse operations",
+      "domain": "omaisolutions.com",
+      "products": [
+        {
+          "name": "Self-Learning WMS",
+          "type": "Core Product",
+          "description": "AI-powered Warehouse Management System that is self-learning, self-healing, auto-integrating, voice-enabled, with minimal implementation effort required",
+          "target_markets": ["SMB", "Mid-Market", "Enterprise"],
+          "mvp_timeline": "Q2 2026 (April-June)",
+          "differentiators": ["Self-learning", "Self-healing", "Auto-integrating", "Voice-enabled", "Minimal implementation"],
+          "domains": ["omwms.com", "omwms.ai"]
+        },
+        {
+          "name": "Warehouse Maturity Study",
+          "type": "Consulting Service",
+          "description": "Assessment service for SMBs to evaluate their warehouse operations maturity and provide actionable recommendations",
+          "target_market": "Small and Medium Businesses",
+          "status": "Concept defined, needs detailed framework development"
+        },
+        {
+          "name": "AI Maturity Study",
+          "type": "Consulting Service",
+          "description": "Assessment service for Medium to Large businesses to evaluate their AI readiness and provide strategic recommendations for AI adoption in supply chain operations",
+          "target_market": "Medium and Large Businesses",
+          "status": "Concept defined, needs detailed framework development"
+        },
+        {
+          "name": "Voice Agents for SMBs",
+          "type": "Product",
+          "description": "Standalone AI voice agents that can be customized and sold to small businesses for various use cases",
+          "target_market": "Small Businesses (not just warehouses)",
+          "use_cases": ["Customer service", "Order status inquiries", "Appointment scheduling", "Basic inventory queries", "Delivery tracking", "FAQ handling"],
+          "tech_stack": ["Web Speech API", "Claude API"],
+          "domains": ["omvoice.ai", "omvoiceai.com"],
+          "status": "Concept defined, needs detailed spec"
+        },
+        {
+          "name": "Enterprise MCP Knowledge Base Server",
+          "type": "Product",
+          "description": "MCP server specifically designed for large businesses to manage internal knowledge base access and maintenance through AI agents",
+          "target_market": "Large Enterprises",
+          "features": ["Secure knowledge base ingestion", "Role-based access control", "Audit trail", "Enterprise document integration", "Multi-tenant architecture"],
+          "status": "Concept defined, needs detailed architecture"
+        }
+      ]
+    }
+  ],
+
+  "team": {
+    "founders": [
+      {
+        "name": "Nishad Tambe",
+        "role": "Founder",
+        "expertise": "30+ years supply chain experience",
+        "email": "nishad@omapex.com"
+      },
+      {
+        "name": "Sumedha Tambe",
+        "role": "Co-founder",
+        "expertise": "PGMP, Black Belt - Project Management & QA"
+      }
+    ],
+    "ai_advisors": ["Gemini", "Grok", "Claude"]
+  }
+}

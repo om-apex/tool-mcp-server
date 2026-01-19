@@ -1,0 +1,116 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-01-19",
+  "source": "Om_Apex_Master_Decision_Log_v1.1.docx and README.md",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "description": "Review Part 6 RAG article draft and publish",
+      "category": "Marketing",
+      "company": "Om AI Solutions",
+      "priority": "High",
+      "due": "2026-01-19",
+      "status": "pending",
+      "notes": "Article: AI_in_Supply_Chain_-_6_of_10_RAG_DRAFT.docx"
+    },
+    {
+      "id": "TASK-002",
+      "description": "Subscribe to Vercel and deploy Om Luxe site",
+      "category": "Technical",
+      "company": "Om Luxe Properties",
+      "priority": "High",
+      "status": "completed",
+      "completed_at": "2026-01-19T10:37:29.152503"
+    },
+    {
+      "id": "TASK-003",
+      "description": "Call Scroggin & Burns for legal consultation",
+      "category": "Legal",
+      "company": "Om Apex Holdings",
+      "priority": "High",
+      "status": "pending",
+      "contact": "(770) 884-7197"
+    },
+    {
+      "id": "TASK-004",
+      "description": "Call Morgan & DiSalvo for legal consultation",
+      "category": "Legal",
+      "company": "Om Apex Holdings",
+      "priority": "High",
+      "status": "pending",
+      "contact": "(678) 720-0750"
+    },
+    {
+      "id": "TASK-005",
+      "description": "Approve GoDaddy transfer email when it arrives",
+      "category": "Technical",
+      "company": "Om AI Solutions",
+      "priority": "Medium",
+      "status": "pending",
+      "notes": "For omaisolutions.com transfer to Cloudflare"
+    },
+    {
+      "id": "TASK-006",
+      "description": "Watch for Replit refund response",
+      "category": "Administrative",
+      "company": "Om Apex Holdings",
+      "priority": "Low",
+      "status": "pending"
+    },
+    {
+      "id": "TASK-007",
+      "description": "Review HTLR improvement plan when received",
+      "category": "Operations",
+      "company": "Om Luxe Properties",
+      "priority": "Medium",
+      "status": "pending",
+      "notes": "Home Team Luxury Rentals is developing a plan to improve revenue and bookings"
+    },
+    {
+      "id": "TASK-008",
+      "description": "Build Om Apex MCP Server",
+      "category": "Technical",
+      "company": "Om Apex Holdings",
+      "priority": "High",
+      "status": "in_progress",
+      "notes": "Proof of concept for Enterprise MCP Knowledge Base product"
+    },
+    {
+      "id": "TASK-009",
+      "description": "Discuss Om Supply Chain LLC (4th entity) with attorneys - separate SaaS products from AI consulting",
+      "category": "Legal",
+      "company": "Om Apex Holdings",
+      "priority": "High",
+      "status": "pending",
+      "created": "2026-01-19T11:01:11.783793",
+      "notes": "Bring domain inventory showing product-to-entity mapping. Get advice on timing, tax implications, and optimal structure."
+    }
+  ],
+  "product_development": [
+    {
+      "product": "Warehouse Maturity Study",
+      "status": "Concept defined",
+      "next_step": "Develop detailed framework"
+    },
+    {
+      "product": "AI Maturity Study",
+      "status": "Concept defined",
+      "next_step": "Develop detailed framework"
+    },
+    {
+      "product": "Voice Agents for SMBs",
+      "status": "Concept defined",
+      "next_step": "Create detailed spec"
+    },
+    {
+      "product": "Enterprise MCP Knowledge Base Server",
+      "status": "Concept defined",
+      "next_step": "Create detailed architecture"
+    },
+    {
+      "product": "Self-Learning WMS",
+      "status": "Planning",
+      "target": "Q2 2026 MVP"
+    }
+  ]
+}

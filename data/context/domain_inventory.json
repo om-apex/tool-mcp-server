@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-01-19",
+  "source": "Om_Apex_Domain_Inventory.docx",
+
+  "summary": {
+    "total_domains": 20,
+    "primary_registrar": "Cloudflare",
+    "cloudflare_count": 19,
+    "transferring": 1,
+    "discontinuing": 1,
+    "estimated_annual_cost": "$400-500"
+  },
+
+  "naming_convention": {
+    "short_domains": "omXXX.com - Easy to type, memorable, primary branding",
+    "long_domains": "SEO-friendly, descriptive, used for redirects or backup",
+    "ai_domains": ".ai - Premium AI branding for key products",
+    "reserved_domains": "Brand protection, prevent competitor registration"
+  },
+
+  "tiers": {
+    "tier1_active_now": {
+      "description": "Currently in use or being deployed immediately",
+      "count": 3,
+      "domains": ["omapex.com", "omluxeproperties.com", "omaisolutions.com"]
+    },
+    "tier2_near_term": {
+      "description": "Will be activated as products launch in 2026",
+      "count": 4,
+      "domains": ["omwms.com", "omwms.ai", "omvoice.ai", "omvoiceai.com"]
+    },
+    "tier3_future": {
+      "description": "Reserved for future product expansion",
+      "count": 9,
+      "product_groups": {
+        "intelligent_integration": ["omintm.com", "omintegrator.com"],
+        "store_management": ["omsfm.com", "omstorefront.com", "omshopfloor.com"],
+        "point_of_sale": ["omepos.com"],
+        "labor_management": ["omlms.com"],
+        "transportation_management": ["omtms.com"]
+      }
+    },
+    "tier4_brand_protection": {
+      "description": "Reserved to prevent competitors",
+      "count": 3,
+      "domains": ["omsupplychain.ai", "omsupplychain.com", "omsupplychainsolutions.com"]
+    },
+    "tier5_discontinue": {
+      "description": "Let expire - do NOT renew",
+      "count": 1,
+      "domains": ["theomgroup.ai"]
+    }
+  },
+
+  "pending_transfer": {
+    "domain": "omaisolutions.com",
+    "from": "GoDaddy",
+    "to": "Cloudflare",
+    "status": "In progress"
+  }
+}
