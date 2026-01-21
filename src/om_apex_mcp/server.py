@@ -26,12 +26,23 @@ logger = logging.getLogger("om-apex-mcp")
 # Initialize MCP server
 server = Server("om-apex-mcp")
 
-# Data directory - configurable via environment variable
-# Priority: OM_APEX_DATA_DIR env var > default local path
-# For Google Drive sync (Shared Drive):
-#   Mac: OM_APEX_DATA_DIR=~/Library/CloudStorage/GoogleDrive-{email}/Shared drives/om-apex/mcp-data
-#   Windows: OM_APEX_DATA_DIR=G:/Shared drives/om-apex/mcp-data
-DEFAULT_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "context"
+# Data directory - uses Google Shared Drive for sync between Nishad (Mac) and Sumedha (Windows)
+# Can be overridden via OM_APEX_DATA_DIR environment variable
+import platform
+
+def get_default_data_dir() -> Path:
+    """Get the default data directory based on platform."""
+    if platform.system() == "Darwin":  # macOS
+        # Mac path for Google Shared Drive
+        return Path.home() / "Library/CloudStorage/GoogleDrive-nishad@omapex.com/Shared drives/om-apex/mcp-data"
+    elif platform.system() == "Windows":
+        # Windows path for Google Shared Drive
+        return Path("G:/Shared drives/om-apex/mcp-data")
+    else:
+        # Fallback to local path for other systems
+        return Path(__file__).parent.parent.parent / "data" / "context"
+
+DEFAULT_DATA_DIR = get_default_data_dir()
 DATA_DIR = Path(os.environ.get("OM_APEX_DATA_DIR", DEFAULT_DATA_DIR)).expanduser()
 
 logger.info(f"Using data directory: {DATA_DIR}")
