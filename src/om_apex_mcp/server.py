@@ -10,6 +10,7 @@ Started: January 19, 2026
 
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -25,8 +26,13 @@ logger = logging.getLogger("om-apex-mcp")
 # Initialize MCP server
 server = Server("om-apex-mcp")
 
-# Data directory - relative to this file's location
-DATA_DIR = Path(__file__).parent.parent.parent / "data" / "context"
+# Data directory - configurable via environment variable
+# Priority: OM_APEX_DATA_DIR env var > default local path
+# For Google Drive sync, set: OM_APEX_DATA_DIR=~/Library/CloudStorage/GoogleDrive-{email}/My Drive/Om Apex/mcp-data
+DEFAULT_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "context"
+DATA_DIR = Path(os.environ.get("OM_APEX_DATA_DIR", DEFAULT_DATA_DIR)).expanduser()
+
+logger.info(f"Using data directory: {DATA_DIR}")
 
 
 def load_json(filename: str) -> dict:
@@ -170,6 +176,58 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {},
+                "required": []
+            }
+        ),
+        Tool(
+            name="add_decision",
+            description="Record a new technology or business decision with reasoning. Use this to persist important decisions made during conversations.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "area": {
+                        "type": "string",
+                        "description": "Area of decision (e.g., 'Frontend Framework', 'Authentication', 'Hosting')"
+                    },
+                    "decision": {
+                        "type": "string",
+                        "description": "The decision made (e.g., 'Use NextAuth.js for authentication')"
+                    },
+                    "rationale": {
+                        "type": "string",
+                        "description": "Why this decision was made - the reasoning and factors considered"
+                    },
+                    "alternatives_considered": {
+                        "type": "string",
+                        "description": "Other options that were considered (optional)"
+                    },
+                    "confidence": {
+                        "type": "string",
+                        "description": "Confidence level: High, Medium, Low (default: Medium)"
+                    },
+                    "company": {
+                        "type": "string",
+                        "description": "Which company this applies to: Om Apex Holdings, Om Luxe Properties, Om AI Solutions"
+                    }
+                },
+                "required": ["area", "decision", "rationale", "company"]
+            }
+        ),
+        Tool(
+            name="get_decisions_history",
+            description="Get all recorded decisions with their rationale, optionally filtered by area or company",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "area": {
+                        "type": "string",
+                        "description": "Filter by area (optional)"
+                    },
+                    "company": {
+                        "type": "string",
+                        "description": "Filter by company (optional)"
+                    }
+                },
                 "required": []
             }
         )
@@ -316,6 +374,57 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         }
 
         return [TextContent(type="text", text=json.dumps(summary, indent=2))]
+
+    elif name == "add_decision":
+        data = load_json("technology_decisions.json")
+        decisions = data.get("decisions", [])
+
+        # Generate next decision ID
+        existing_ids = [d.get("id", "") for d in decisions]
+        max_num = 0
+        for did in existing_ids:
+            if did.startswith("TECH-"):
+                try:
+                    num = int(did.split("-")[1])
+                    max_num = max(max_num, num)
+                except ValueError:
+                    pass
+        new_id = f"TECH-{max_num + 1:03d}"
+
+        # Create new decision
+        new_decision = {
+            "id": new_id,
+            "area": arguments["area"],
+            "date_decided": datetime.now().strftime("%Y-%m-%d"),
+            "confidence": arguments.get("confidence", "Medium"),
+            "decision": arguments["decision"],
+            "rationale": arguments["rationale"],
+            "company": arguments["company"]
+        }
+        if arguments.get("alternatives_considered"):
+            new_decision["alternatives_considered"] = arguments["alternatives_considered"]
+
+        decisions.append(new_decision)
+        data["decisions"] = decisions
+        data["last_updated"] = datetime.now().strftime("%Y-%m-%d")
+        save_json("technology_decisions.json", data)
+
+        return [TextContent(type="text", text=f"Decision recorded successfully:\n{json.dumps(new_decision, indent=2)}")]
+
+    elif name == "get_decisions_history":
+        data = load_json("technology_decisions.json")
+        decisions = data.get("decisions", [])
+
+        # Apply filters if provided
+        area = arguments.get("area")
+        company = arguments.get("company")
+
+        if area:
+            decisions = [d for d in decisions if area.lower() in d.get("area", "").lower()]
+        if company:
+            decisions = [d for d in decisions if d.get("company", "").lower() == company.lower()]
+
+        return [TextContent(type="text", text=json.dumps(decisions, indent=2))]
 
     else:
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
