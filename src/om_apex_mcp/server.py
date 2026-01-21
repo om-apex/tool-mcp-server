@@ -120,7 +120,7 @@ async def list_tools() -> list[Tool]:
                     },
                     "owner": {
                         "type": "string",
-                        "description": "Filter by owner: Nishad, Sumedha, Both (optional)"
+                        "description": "Filter by owner name (e.g., Nishad, Sumedha, Both, Claude, Scroggin, etc.)"
                     }
                 },
                 "required": []
@@ -128,13 +128,13 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="add_task",
-            description="Add a new task to the pending tasks list. Owner can be specified in parentheses at end of description, e.g. 'Build website (Sumedha)'",
+            description="Add a new task to the pending tasks list. Owner can be specified in parentheses at end of description, e.g. 'Build website (Sumedha)' or 'Call attorney (Scroggin)'",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "description": {
                         "type": "string",
-                        "description": "Description of the task. Include owner in parentheses at end, e.g. 'Build website (Sumedha)'"
+                        "description": "Description of the task. Include owner in parentheses at end, e.g. 'Build website (Sumedha)' or 'Follow up on quote (Scroggin)'"
                     },
                     "category": {
                         "type": "string",
@@ -305,17 +305,17 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     pass
         new_id = f"TASK-{max_num + 1:03d}"
 
-        # Parse owner from description if present (e.g., "Build website (Sumedha)")
+        # Parse owner from description if present
+        # Supports: "(Name)" at end, or "Name to do X" pattern
         description = arguments["description"]
         owner = None
-        owner_match = re.search(r'\((\w+)\)\s*$', description)
+
+        # Pattern 1: (Name) at end of description - accepts any single word as owner
+        owner_match = re.search(r'\(([A-Za-z]+)\)\s*$', description)
         if owner_match:
-            potential_owner = owner_match.group(1)
-            # Only extract if it looks like a name (Nishad, Sumedha, Both, Claude)
-            if potential_owner.lower() in ['nishad', 'sumedha', 'both', 'claude']:
-                owner = potential_owner.capitalize()
-                # Remove owner from description for cleaner storage
-                description = re.sub(r'\s*\(\w+\)\s*$', '', description)
+            owner = owner_match.group(1).capitalize()
+            # Remove owner from description for cleaner storage
+            description = re.sub(r'\s*\([A-Za-z]+\)\s*$', '', description)
 
         # Create new task
         new_task = {
