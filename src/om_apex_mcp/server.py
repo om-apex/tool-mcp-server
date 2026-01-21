@@ -46,7 +46,11 @@ def get_default_data_dir() -> Path:
 DEFAULT_DATA_DIR = get_default_data_dir()
 DATA_DIR = Path(os.environ.get("OM_APEX_DATA_DIR", DEFAULT_DATA_DIR)).expanduser()
 
+# Daily Progress directory - derived from shared drive root
+DAILY_PROGRESS_DIR = DATA_DIR.parent / "business-plan" / "06 HR and Admin" / "Daily Progress"
+
 logger.info(f"Using data directory: {DATA_DIR}")
+logger.info(f"Using daily progress directory: {DAILY_PROGRESS_DIR}")
 
 
 def load_json(filename: str) -> dict:
@@ -247,6 +251,64 @@ async def list_tools() -> list[Tool]:
                     }
                 },
                 "required": []
+            }
+        ),
+        Tool(
+            name="get_daily_progress",
+            description="Get the daily progress log for a specific date",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "type": "string",
+                        "description": "Date in YYYY-MM-DD format (e.g., '2026-01-21')"
+                    }
+                },
+                "required": ["date"]
+            }
+        ),
+        Tool(
+            name="add_daily_progress",
+            description="Add a session entry to the daily progress log. Creates file if it doesn't exist for today.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "person": {
+                        "type": "string",
+                        "description": "Who is logging this session: Nishad or Sumedha"
+                    },
+                    "interface": {
+                        "type": "string",
+                        "description": "Which Claude interface: code, cowork, chat, or code-app"
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Brief title for this session (e.g., 'MCP Server Setup')"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The full session progress content in markdown format"
+                    }
+                },
+                "required": ["person", "interface", "title", "content"]
+            }
+        ),
+        Tool(
+            name="search_daily_progress",
+            description="Search through all daily progress logs for relevant content. Returns matching file contents for Claude to analyze semantically.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "search_text": {
+                        "type": "string",
+                        "description": "Text to search for in daily progress logs"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of files to return (default: 10)"
+                    }
+                },
+                "required": ["search_text"]
             }
         )
     ]
@@ -460,6 +522,124 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             decisions = [d for d in decisions if d.get("company", "").lower() == company.lower()]
 
         return [TextContent(type="text", text=json.dumps(decisions, indent=2))]
+
+    elif name == "get_daily_progress":
+        date = arguments["date"]
+
+        # Look for file matching the date pattern
+        if not DAILY_PROGRESS_DIR.exists():
+            return [TextContent(type="text", text=f"Daily Progress directory not found: {DAILY_PROGRESS_DIR}")]
+
+        # Try exact match first (YYYY-MM-DD.md)
+        exact_file = DAILY_PROGRESS_DIR / f"{date}.md"
+        if exact_file.exists():
+            with open(exact_file, "r", encoding="utf-8") as f:
+                content = f.read()
+            return [TextContent(type="text", text=content)]
+
+        # Try pattern match (files starting with the date)
+        matching_files = list(DAILY_PROGRESS_DIR.glob(f"{date}*.md"))
+        if matching_files:
+            # Read the first matching file
+            with open(matching_files[0], "r", encoding="utf-8") as f:
+                content = f.read()
+            return [TextContent(type="text", text=f"File: {matching_files[0].name}\n\n{content}")]
+
+        return [TextContent(type="text", text=f"No daily progress log found for {date}")]
+
+    elif name == "add_daily_progress":
+        person = arguments["person"]
+        interface = arguments["interface"].lower()
+        title = arguments["title"]
+        content = arguments["content"]
+
+        # Ensure directory exists
+        DAILY_PROGRESS_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Get today's date and timestamp
+        today = datetime.now().strftime("%Y-%m-%d")
+        timestamp = datetime.now().strftime("%I:%M %p EST").lstrip("0")
+
+        # File path for today
+        filepath = DAILY_PROGRESS_DIR / f"{today}.md"
+
+        # Determine session number
+        session_num = 1
+        existing_content = ""
+
+        if filepath.exists():
+            with open(filepath, "r", encoding="utf-8") as f:
+                existing_content = f.read()
+            # Count existing sessions
+            session_matches = re.findall(r"## Session (\d+)", existing_content)
+            if session_matches:
+                session_num = max(int(n) for n in session_matches) + 1
+
+        # Build the session entry
+        session_header = f"## Session {session_num} (by {person}) ({interface}) ({timestamp}) - {title}"
+        session_entry = f"\n---\n\n{session_header}\n\n{content}\n"
+
+        # Write to file
+        if existing_content:
+            # Append to existing file
+            with open(filepath, "a", encoding="utf-8") as f:
+                f.write(session_entry)
+        else:
+            # Create new file with header
+            file_header = f"# Daily Progress - {today}\n"
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(file_header + session_entry)
+
+        return [TextContent(type="text", text=f"Daily progress logged successfully:\n- File: {filepath.name}\n- Session: {session_num}\n- Person: {person}\n- Interface: {interface}\n- Title: {title}")]
+
+    elif name == "search_daily_progress":
+        search_text = arguments["search_text"].lower()
+        limit = arguments.get("limit", 10)
+
+        if not DAILY_PROGRESS_DIR.exists():
+            return [TextContent(type="text", text=f"Daily Progress directory not found: {DAILY_PROGRESS_DIR}")]
+
+        # Get all markdown files, sorted by date (newest first)
+        md_files = sorted(DAILY_PROGRESS_DIR.glob("*.md"), reverse=True)
+
+        results = []
+        for filepath in md_files[:limit * 2]:  # Check more files than limit in case some don't match
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                # Simple text search (Claude will do semantic analysis)
+                if search_text in content.lower():
+                    results.append({
+                        "file": filepath.name,
+                        "date": filepath.stem.split("_")[0] if "_" in filepath.stem else filepath.stem,
+                        "content": content
+                    })
+
+                    if len(results) >= limit:
+                        break
+            except Exception as e:
+                logger.error(f"Error reading {filepath}: {e}")
+                continue
+
+        if not results:
+            # If no exact matches, return recent files for Claude to analyze
+            results = []
+            for filepath in md_files[:limit]:
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    results.append({
+                        "file": filepath.name,
+                        "date": filepath.stem.split("_")[0] if "_" in filepath.stem else filepath.stem,
+                        "content": content
+                    })
+                except Exception as e:
+                    continue
+
+            return [TextContent(type="text", text=f"No exact matches for '{search_text}'. Returning {len(results)} recent logs for semantic analysis:\n\n" + json.dumps(results, indent=2))]
+
+        return [TextContent(type="text", text=f"Found {len(results)} matching logs:\n\n" + json.dumps(results, indent=2))]
 
     else:
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
