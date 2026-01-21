@@ -30,8 +30,8 @@ Open PowerShell (regular, not Admin) and run:
 
 ```powershell
 # Create directory structure
-mkdir -p C:\Users\sumedha\om-apex\om-ai
-cd C:\Users\sumedha\om-apex\om-ai
+mkdir -p C:\Users\14042\om-apex\om-ai
+cd C:\Users\14042\om-apex\om-ai
 
 # Clone the repository
 git clone https://github.com/nishad-apex/om-apex-mcp.git
@@ -50,42 +50,43 @@ python -c "import om_apex_mcp; print('OK')"
 
 ## Step 4: Set Up Google Drive for Shared Data
 
-The MCP server stores context in JSON files. We use Google Drive to sync data between laptops.
+The MCP server stores context in JSON files. We use the **Om Apex Shared Drive** to sync data between laptops.
 
 ### 4a. Install Google Drive for Desktop
 1. Download from https://www.google.com/drive/download/
 2. Sign in with **sumedha@omapex.com** (the Om Apex Google account)
-3. Choose "Mirror files" for the om-apex folder to ensure offline access
+3. Mount the drive as **G:** (or note which letter it uses)
+4. Enable sync for the **om-apex** Shared Drive
 
-### 4b. Verify Google Drive Path
+### 4b. Verify Shared Drive Path
 After Google Drive syncs, verify the data folder exists:
 
-```powershell
-# Check if the mcp-data folder exists
-dir "G:\My Drive\om-apex\mcp-data"
+```bash
+# Check if the mcp-data folder exists in the SHARED DRIVE (not My Drive)
+ls "G:/Shared drives/om-apex/mcp-data"
 ```
 
-**Note:** The drive letter may vary. Common paths on Windows:
-- `G:\My Drive\om-apex\mcp-data` (if Google Drive is mounted as G:)
-- `C:\Users\sumedha\Google Drive\om-apex\mcp-data` (older installations)
-- `C:\Users\sumedha\My Drive\om-apex\mcp-data`
+You should see 4 JSON files:
+- company_structure.json
+- technology_decisions.json
+- domain_inventory.json
+- pending_tasks.json
 
-To find your Google Drive path, open File Explorer and look for "Google Drive" in the sidebar.
+**Note:** The path is `G:/Shared drives/om-apex/mcp-data` (Shared drives, not My Drive).
 
 ## Step 5: Configure Claude Code MCP Server
 
-Add the MCP server using the Claude CLI. **Replace the path with your actual Google Drive path:**
+Add the MCP server using the Claude CLI:
 
-```powershell
-# Add the om-apex MCP server with Google Drive data path
-# IMPORTANT: Use the correct path for YOUR Google Drive installation
-claude mcp add om-apex --scope user -e OM_APEX_DATA_DIR="G:\My Drive\om-apex\mcp-data" -- python -m om_apex_mcp.server
+```bash
+# Add the om-apex MCP server with Shared Drive data path
+claude mcp add om-apex --scope user -e OM_APEX_DATA_DIR="G:/Shared drives/om-apex/mcp-data" -- python -m om_apex_mcp.server
 ```
 
-**If your Google Drive uses a different path**, adjust accordingly:
-```powershell
-# Example with different path
-claude mcp add om-apex --scope user -e OM_APEX_DATA_DIR="C:\Users\sumedha\Google Drive\om-apex\mcp-data" -- python -m om_apex_mcp.server
+**If your Google Drive uses a different drive letter**, adjust accordingly:
+```bash
+# Example with different drive letter
+claude mcp add om-apex --scope user -e OM_APEX_DATA_DIR="H:/Shared drives/om-apex/mcp-data" -- python -m om_apex_mcp.server
 ```
 
 **Verify the server was added:**
@@ -100,7 +101,7 @@ om-apex: python -m om_apex_mcp.server - ✓ Connected
 
 ## Step 6: Create the Global CLAUDE.md
 
-Create a file at `C:\Users\sumedha\CLAUDE.md` with the following content:
+Create a file at `C:\Users\14042\CLAUDE.md` with the following content:
 
 ```markdown
 # Global Claude Context - Om Apex Holdings
@@ -264,7 +265,7 @@ You should see the Om Apex Holdings context with company structure, tasks, and d
 python --version
 
 # If not found, add Python to PATH or use full path
-# e.g., C:\Users\sumedha\AppData\Local\Programs\Python\Python311\python.exe
+# e.g., C:\Users\14042\AppData\Local\Programs\Python\Python311\python.exe
 ```
 
 ### MCP Server Not Found
@@ -273,7 +274,7 @@ python --version
 pip show om-apex-mcp
 
 # If not found, reinstall
-cd C:\Users\sumedha\om-apex\om-ai\om-apex-mcp
+cd C:\Users\14042\om-apex\om-ai\om-apex-mcp
 pip install -e .
 ```
 
@@ -300,7 +301,7 @@ claude mcp add om-apex --scope user -e OM_APEX_DATA_DIR="CORRECT_PATH_HERE" -- p
 When Nishad pushes updates to the MCP server code:
 
 ```powershell
-cd C:\Users\sumedha\om-apex\om-ai\om-apex-mcp
+cd C:\Users\14042\om-apex\om-ai\om-apex-mcp
 git pull origin main
 pip install -e .
 # Restart Claude Code
@@ -313,7 +314,7 @@ pip install -e .
 | Item | Value |
 |------|-------|
 | MCP Repo | `github.com/nishad-apex/om-apex-mcp` |
-| Local Clone | `C:\Users\sumedha\om-apex\om-ai\om-apex-mcp` |
-| Google Drive Data | `G:\My Drive\om-apex\mcp-data` (verify your path) |
-| CLAUDE.md | `C:\Users\sumedha\CLAUDE.md` |
+| Local Clone | `C:\Users\14042\om-apex\om-ai\om-apex-mcp` |
+| Shared Drive Data | `G:\Shared drives\om-apex\mcp-data` |
+| CLAUDE.md | `C:\Users\14042\CLAUDE.md` |
 | Om Apex Email | `sumedha@omapex.com` (Google Drive) |
