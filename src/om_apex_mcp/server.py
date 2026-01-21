@@ -37,8 +37,8 @@ def get_default_data_dir() -> Path:
         # Mac path for Google Shared Drive
         return Path.home() / "Library/CloudStorage/GoogleDrive-nishad@omapex.com/Shared drives/om-apex/mcp-data"
     elif platform.system() == "Windows":
-        # Windows path for Google Shared Drive
-        return Path("G:/Shared drives/om-apex/mcp-data")
+        # Windows path for Google Shared Drive (Sumedha's laptop uses H:)
+        return Path("H:/Shared drives/om-apex/mcp-data")
     else:
         # Fallback to local path for other systems
         return Path(__file__).parent.parent.parent / "data" / "context"
