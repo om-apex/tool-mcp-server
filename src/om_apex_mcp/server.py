@@ -193,6 +193,44 @@ async def list_tools() -> list[Tool]:
             }
         ),
         Tool(
+            name="update_task",
+            description="Update any field of an existing task (description, notes, priority, category, company, owner)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "string",
+                        "description": "The task ID (e.g., TASK-001)"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "New description for the task (optional)"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "New or updated notes (optional)"
+                    },
+                    "priority": {
+                        "type": "string",
+                        "description": "New priority: High, Medium, Low (optional)"
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "New category: Technical, Marketing, Legal, Operations, Administrative, Content (optional)"
+                    },
+                    "company": {
+                        "type": "string",
+                        "description": "New company: Om Apex Holdings, Om Luxe Properties, Om AI Solutions, Om Supply Chain (optional)"
+                    },
+                    "owner": {
+                        "type": "string",
+                        "description": "New owner name (optional)"
+                    }
+                },
+                "required": ["task_id"]
+            }
+        ),
+        Tool(
             name="get_full_context",
             description="Get a comprehensive summary of all Om Apex Holdings context (company, decisions, tasks) - useful for starting a new conversation",
             inputSchema={
@@ -461,6 +499,56 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 data["last_updated"] = datetime.now().strftime("%Y-%m-%d")
                 save_json("pending_tasks.json", data)
                 return [TextContent(type="text", text=f"Task {task_id} status updated to {new_status}:\n{json.dumps(task, indent=2)}")]
+
+        return [TextContent(type="text", text=f"Task {task_id} not found")]
+
+    elif name == "update_task":
+        data = load_json("pending_tasks.json")
+        tasks = data.get("tasks", [])
+        task_id = arguments["task_id"]
+
+        for task in tasks:
+            if task.get("id") == task_id:
+                # Track what was updated
+                updates = []
+
+                # Update fields if provided
+                if "description" in arguments and arguments["description"]:
+                    task["description"] = arguments["description"]
+                    updates.append("description")
+
+                if "notes" in arguments and arguments["notes"]:
+                    task["notes"] = arguments["notes"]
+                    updates.append("notes")
+
+                if "priority" in arguments and arguments["priority"]:
+                    if arguments["priority"] not in ["High", "Medium", "Low"]:
+                        return [TextContent(type="text", text=f"Invalid priority: {arguments['priority']}. Must be High, Medium, or Low")]
+                    task["priority"] = arguments["priority"]
+                    updates.append("priority")
+
+                if "category" in arguments and arguments["category"]:
+                    task["category"] = arguments["category"]
+                    updates.append("category")
+
+                if "company" in arguments and arguments["company"]:
+                    task["company"] = arguments["company"]
+                    updates.append("company")
+
+                if "owner" in arguments and arguments["owner"]:
+                    task["owner"] = arguments["owner"]
+                    updates.append("owner")
+
+                if not updates:
+                    return [TextContent(type="text", text=f"No updates provided for task {task_id}")]
+
+                # Save changes
+                task["updated_at"] = datetime.now().isoformat()
+                data["tasks"] = tasks
+                data["last_updated"] = datetime.now().strftime("%Y-%m-%d")
+                save_json("pending_tasks.json", data)
+
+                return [TextContent(type="text", text=f"Task {task_id} updated successfully.\nUpdated fields: {', '.join(updates)}\n\n{json.dumps(task, indent=2)}")]
 
         return [TextContent(type="text", text=f"Task {task_id} not found")]
 
