@@ -76,6 +76,7 @@ def save_json(filename: str, data: dict) -> None:
 
 READING_TOOLS = [
     "get_full_context",
+    "get_claude_instructions",
     "get_company_context",
     "get_technology_decisions",
     "get_decisions_history",
@@ -93,6 +94,76 @@ WRITING_TOOLS = [
     "add_decision",
     "add_daily_progress",
 ]
+
+
+def get_claude_instructions_data() -> dict:
+    """
+    Return behavioral instructions for Claude across all platforms.
+    This is used by both get_claude_instructions and get_full_context tools.
+    """
+    return {
+        "session_start": {
+            "description": "How to behave when starting a new conversation",
+            "steps": [
+                "1. Call get_full_context automatically at conversation start",
+                "2. Output ONLY a brief 2-3 line greeting (see greeting_format below)",
+                "3. Do NOT dump full context details to the user - you have the data internally",
+                "4. Wait for user's first request"
+            ],
+            "greeting_format": {
+                "template": "Full context loaded.\n\n**Quick Summary:** X pending tasks (Y high priority)\n\nHow can I help you today?",
+                "rules": [
+                    "Replace X with total pending task count",
+                    "Replace Y with high priority task count",
+                    "Do NOT list tasks, decisions, tech stack, or other details",
+                    "Do NOT explain what context was loaded",
+                    "Keep it to exactly 3 lines as shown in template"
+                ]
+            }
+        },
+        "session_end": {
+            "description": "How to behave when user says 'end session', 'wrap up', 'save our work', or similar",
+            "steps": [
+                "1. Review the entire conversation for: decisions made, tasks completed, new tasks identified",
+                "2. Summarize findings to user: 'I found X decisions, Y new tasks, Z completed tasks'",
+                "3. Get user confirmation before saving",
+                "4. Call add_decision for each decision (with area, decision, rationale, company)",
+                "5. Call add_task for each new task",
+                "6. Call complete_task for each completed task",
+                "7. Call add_daily_progress with structured data",
+                "8. Confirm everything was saved successfully"
+            ],
+            "add_daily_progress_format": {
+                "person": "Nishad or Sumedha (whoever is running the session)",
+                "interface": "code, code-app, cowork, or chat (lowercase)",
+                "title": "Brief title of main work done",
+                "completed": ["List of items completed"],
+                "decisions": ["TECH-XXX: Description"],
+                "tasks_completed": ["TASK-XXX: Description"],
+                "tasks_created": ["TASK-XXX: Description"],
+                "files_modified": ["path/to/file - description"],
+                "notes": ["Important context for future reference"]
+            }
+        },
+        "general_behavior": {
+            "tone": "Professional, concise, helpful",
+            "response_style": [
+                "Keep responses focused and actionable",
+                "Use markdown formatting for readability",
+                "When listing tasks, show ID and description",
+                "Don't over-explain - users are familiar with their business"
+            ],
+            "proactive_actions": [
+                "Offer to save decisions when significant choices are made",
+                "Suggest creating tasks for follow-up items",
+                "Remind about session end protocol if conversation seems to be wrapping up"
+            ]
+        },
+        "owners": {
+            "Nishad": "Primary technical owner, supply chain expert, handles most Claude sessions",
+            "Sumedha": "Co-owner, handles content, website updates, and some technical tasks"
+        }
+    }
 
 
 # =============================================================================
@@ -259,6 +330,15 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="get_full_context",
             description="Get a comprehensive summary of all Om Apex Holdings context (company, decisions, tasks) - useful for starting a new conversation",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        ),
+        Tool(
+            name="get_claude_instructions",
+            description="Get behavioral instructions for Claude across all platforms (Chat, Cowork, Code). Defines how to greet users, end sessions, and format responses consistently.",
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -595,26 +675,21 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
 How can I help you today?"""
 
+        # Get behavioral instructions
+        instructions = get_claude_instructions_data()
+
         summary = {
-            "display": {
-                "INSTRUCTION": "Output EXACTLY the text in 'output' below - nothing more, nothing less. This ensures consistent greeting across all Claude platforms.",
-                "output": display_text
+            "CRITICAL_INSTRUCTION": {
+                "action": "OUTPUT ONLY THE TEXT BELOW - NOTHING ELSE",
+                "output": display_text,
+                "rules": [
+                    "Do NOT list tasks, decisions, tech stack, domains, or any other details",
+                    "Do NOT explain what was loaded or summarize the context",
+                    "Do NOT add any additional greeting or pleasantries",
+                    "Just output the 3 lines shown in 'output' above, exactly as written"
+                ]
             },
-            "session_workflow": {
-                "session_end": {
-                    "trigger": "When user says 'end session', 'wrap up', 'save our work', or similar",
-                    "steps": [
-                        "1. Review conversation for: decisions made, tasks completed, new tasks identified",
-                        "2. Summarize findings to user and get confirmation",
-                        "3. Call add_decision for each decision (area, decision, rationale, company)",
-                        "4. Call add_task for each new task",
-                        "5. Call complete_task for each completed task",
-                        "6. Call add_daily_progress with: person, interface, title, completed, decisions, tasks_completed, tasks_created, files_modified, notes",
-                        "7. Confirm everything was saved"
-                    ]
-                },
-                "mcp_server_code_location": "/Users/nishad/om-apex/om-ai/om-apex-mcp/ (main: src/om_apex_mcp/server.py)"
-            },
+            "behavioral_instructions": instructions,
             "available_tools": {
                 "reading": READING_TOOLS,
                 "writing": WRITING_TOOLS
@@ -641,6 +716,10 @@ How can I help you today?"""
         }
 
         return [TextContent(type="text", text=json.dumps(summary, indent=2))]
+
+    elif name == "get_claude_instructions":
+        instructions = get_claude_instructions_data()
+        return [TextContent(type="text", text=json.dumps(instructions, indent=2))]
 
     elif name == "add_decision":
         data = load_json("technology_decisions.json")
