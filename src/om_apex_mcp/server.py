@@ -70,6 +70,32 @@ def save_json(filename: str, data: dict) -> None:
 
 
 # =============================================================================
+# Tool Categorization (for get_full_context response)
+# When adding a new tool, add it to the appropriate category below
+# =============================================================================
+
+READING_TOOLS = [
+    "get_full_context",
+    "get_company_context",
+    "get_technology_decisions",
+    "get_decisions_history",
+    "get_domain_inventory",
+    "get_pending_tasks",
+    "get_daily_progress",
+    "search_daily_progress",
+]
+
+WRITING_TOOLS = [
+    "add_task",
+    "complete_task",
+    "update_task_status",
+    "update_task",
+    "add_decision",
+    "add_daily_progress",
+]
+
+
+# =============================================================================
 # Tool Definitions
 # =============================================================================
 
@@ -590,8 +616,8 @@ How can I help you today?"""
                 "mcp_server_code_location": "/Users/nishad/om-apex/om-ai/om-apex-mcp/ (main: src/om_apex_mcp/server.py)"
             },
             "available_tools": {
-                "reading": ["get_full_context", "get_company_context", "get_technology_decisions", "get_decisions_history", "get_domain_inventory", "get_pending_tasks", "get_daily_progress", "search_daily_progress"],
-                "writing": ["add_task", "complete_task", "update_task_status", "add_decision", "add_daily_progress"]
+                "reading": READING_TOOLS,
+                "writing": WRITING_TOOLS
             },
             "company_overview": {
                 "holding_company": company.get("holding_company", {}).get("name"),
