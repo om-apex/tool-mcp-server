@@ -1,0 +1,172 @@
+<!--
+  Om Apex Holdings — Reusable Document Header & Footer Template
+
+  Usage:
+    This template uses {{variable}} placeholders that map to company-config.json.
+    Replace placeholders with values from the appropriate company's config file.
+
+    Variables:
+      {{logo}}                  - brand.logo (path to logo file)
+      {{primary_color}}         - brand.primary_color
+      {{accent_color}}          - brand.accent_color
+      {{secondary_text_color}}  - brand.secondary_text_color
+      {{heading_font}}          - brand.heading_font
+      {{display_name_line1}}    - company.display_name_line1
+      {{display_name_line2}}    - company.display_name_line2
+      {{address_line1}}         - contact.address_line1
+      {{address_line2}}         - contact.address_line2
+      {{phone}}                 - contact.phone
+      {{tagline}}               - company.tagline
+      {{company_name}}          - company.name
+      {{footer_left}}           - auto-generated (see rules below)
+      {{page_num}}              - current page number
+      {{page_total}}            - total pages
+
+    Footer Left Block Rules:
+      - If company.is_parent == true:
+          {{company_name}}
+          (single line, no subsidiary text)
+      - If company.is_parent == false:
+          {{company_name}}
+          — A subsidiary of —
+          {{company.subsidiary_of}}
+
+    Cover Page Variables (from document-config.json in document folder):
+      {{product_name}}          - product.name (e.g. "AI Quorum")
+      {{product_tagline}}       - product.tagline (e.g. "Your AI Panel of Experts")
+      {{doc_purpose}}           - document.purpose (e.g. "Product Requirements Document")
+      {{doc_abbreviation}}      - document.abbreviation (e.g. "PRD")
+      {{doc_version}}           - document.version
+      {{doc_date}}              - document.date
+      {{doc_status}}            - document.status
+      {{doc_owner}}             - document.owner
+      {{doc_parent}}            - document.parent
+
+    Config file lookup order:
+      1. document-config.json in the same folder as the source document
+      2. Parameters passed to the conversion script
+      3. company-config.json found by walking up from the document folder
+
+    Auto-Bookmark Rules (applied automatically by pdf_generator.py):
+      - All headings get anchor IDs based on their content:
+          "# Section 3: Title"      → id="section-3"
+          "## 3.1 Title"            → id="section-3-1"
+          "### 3.1.1 Title"         → id="section-3-1-1"
+          "# Appendix H: Title"     → id="appendix-h"
+          "## H.1 Title"            → id="appendix-h-1"
+      - TOC tables are auto-detected and entries become clickable links
+      - No manual anchor tags needed in markdown source documents
+-->
+
+<!-- ── HEADER ── -->
+<div class="doc-header">
+  <div class="doc-header-left">
+    <img class="doc-header-logo" src="{{logo}}" alt="{{display_name_line1}} {{display_name_line2}}">
+    <span class="doc-header-company">{{display_name_line1}}<br>{{display_name_line2}}</span>
+  </div>
+  <div class="doc-header-address">
+    <table>
+      <tr style="vertical-align: top;">
+        <td><svg width="14" height="14" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></td>
+        <td>{{address_line1}}<br>{{address_line2}}</td>
+      </tr>
+      <tr><td colspan="2" style="padding: 1px 0;"><hr style="border: none; border-top: 1px solid #D0D0D0; margin: 0;"></td></tr>
+      <tr>
+        <td style="vertical-align: middle;">&#x260E;</td>
+        <td style="vertical-align: middle;">{{phone}}</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ── FOOTER (subsidiary version) ── -->
+<div class="doc-footer">
+  <span class="doc-footer-left">{{footer_left}}</span>
+  <span class="doc-footer-tagline">{{tagline}}</span>
+  <span class="doc-footer-page">{{page_num}} of {{page_total}}</span>
+</div>
+
+<!-- ── STYLES ── -->
+<style>
+  /* ── Header ── */
+  .doc-header {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 80px;
+    padding: 0 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid {{accent_color}};
+    overflow: hidden;
+  }
+  .doc-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    align-self: center;
+  }
+  .doc-header-logo {
+    height: 72px;
+    width: auto;
+  }
+  .doc-header-company {
+    font-family: {{heading_font}};
+    font-weight: 600;
+    font-size: 18px;
+    color: {{primary_color}};
+    letter-spacing: 1px;
+    line-height: 1.2;
+  }
+  .doc-header-address {
+    color: {{secondary_text_color}};
+    font-size: 9px;
+    line-height: 1.2;
+    align-self: center;
+  }
+  .doc-header-address table {
+    border-collapse: collapse;
+  }
+  .doc-header-address td {
+    padding: 0 0 0 6px;
+    vertical-align: top;
+    text-align: left;
+  }
+  .doc-header-address td:first-child {
+    padding-left: 0;
+    font-size: 12px;
+  }
+
+  /* ── Footer ── */
+  .doc-footer {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 8px 60px 20px 60px;
+    border-top: 1px solid {{accent_color}};
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: {{secondary_text_color}};
+    font-size: 10px;
+  }
+  .doc-footer-left {
+    text-align: center;
+    line-height: 1.2;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    font-size: 8px;
+  }
+  .doc-footer-tagline {
+    flex: 1;
+    text-align: center;
+    font-style: italic;
+    font-size: 12px;
+  }
+  .doc-footer-page {
+    flex: 1;
+    text-align: right;
+    white-space: nowrap;
+  }
+</style>

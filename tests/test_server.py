@@ -10,7 +10,7 @@ import sys
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from om_apex_mcp.server import load_json, save_json, DATA_DIR
+from om_apex_mcp.tools.helpers import load_json, save_json, DATA_DIR
 
 
 class TestDataLoading:
@@ -69,6 +69,37 @@ class TestTasks:
             assert "id" in task
             assert "description" in task
             assert "status" in task
+
+
+class TestModuleRegistration:
+    """Test that all tool modules register correctly."""
+
+    def test_all_modules_load(self):
+        """Test that server imports and registers all modules."""
+        from om_apex_mcp.tools import context, tasks, progress, documents
+
+        task_mod = tasks.register()
+        progress_mod = progress.register()
+        documents_mod = documents.register()
+
+        all_reading = context.READING + task_mod.reading_tools + progress_mod.reading_tools + documents_mod.reading_tools
+        all_writing = context.WRITING + task_mod.writing_tools + progress_mod.writing_tools + documents_mod.writing_tools
+
+        context_mod = context.register(all_reading, all_writing)
+
+        all_tools = []
+        for m in [context_mod, task_mod, progress_mod, documents_mod]:
+            all_tools.extend(t.name for t in m.tools)
+
+        # 7 context + 5 tasks + 3 progress + 2 documents = 17
+        assert len(all_tools) == 17
+
+        # Spot-check key tools exist
+        assert "get_full_context" in all_tools
+        assert "add_task" in all_tools
+        assert "add_daily_progress" in all_tools
+        assert "generate_branded_html" in all_tools
+        assert "list_company_configs" in all_tools
 
 
 if __name__ == "__main__":
