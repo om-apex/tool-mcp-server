@@ -1,0 +1,38 @@
+{
+  "holding_company": {
+    "name": "Acme Holdings LLC",
+    "ownership": {
+      "founder_a": "50%",
+      "founder_b": "50%"
+    },
+    "domain": "acmeholdings.com"
+  },
+  "subsidiaries": [
+    {
+      "name": "Acme Properties LLC",
+      "domain": "acmeproperties.com",
+      "current_property": {
+        "name": "Mountain View Cabin",
+        "location": "Blue Ridge, GA",
+        "management": "Local Property Management (20% commission)"
+      }
+    },
+    {
+      "name": "Acme AI Solutions LLC",
+      "domain": "acmeaisolutions.com",
+      "products": [
+        "Smart Warehouse System",
+        "Warehouse Assessment Tool",
+        "AI Readiness Study",
+        "Voice Agents for SMBs"
+      ]
+    }
+  ],
+  "team": {
+    "founders": [
+      {"name": "Founder A", "role": "CEO"},
+      {"name": "Founder B", "role": "COO"}
+    ]
+  },
+  "_demo_note": "This is sample data for demonstration purposes. Real company data requires authentication."
+}

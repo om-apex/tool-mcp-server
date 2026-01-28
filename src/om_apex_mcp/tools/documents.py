@@ -15,7 +15,8 @@ import markdown as md_lib
 from mcp.types import Tool, TextContent
 
 from . import ToolModule
-from .helpers import SHARED_DRIVE_ROOT
+from .helpers import get_backend
+from ..storage import LocalStorage
 
 READING = ["list_company_configs"]
 WRITING = ["generate_branded_html"]
@@ -27,6 +28,15 @@ COMPANY_CONFIG_PATHS = [
     "om-scm",
     "",  # root = Om Apex Holdings
 ]
+
+
+def _get_shared_drive_root() -> Path:
+    """Get the shared drive root from the current storage backend."""
+    backend = get_backend()
+    if isinstance(backend, LocalStorage):
+        return backend.shared_drive_root
+    # For non-local backends, documents module is not supported (local-only feature)
+    raise RuntimeError("Document generation is only supported with local storage")
 
 
 def _find_company_config(start_path: str) -> dict:
@@ -47,7 +57,7 @@ def _find_company_config(start_path: str) -> dict:
 def _find_company_config_by_name(company: str) -> Optional[dict]:
     """Find company-config.json by company name from known paths."""
     for subdir in COMPANY_CONFIG_PATHS:
-        config_path = SHARED_DRIVE_ROOT / subdir / "company-config.json" if subdir else SHARED_DRIVE_ROOT / "company-config.json"
+        config_path = _get_shared_drive_root() / subdir / "company-config.json" if subdir else _get_shared_drive_root() / "company-config.json"
         if config_path.exists():
             try:
                 config = json.loads(config_path.read_text(encoding="utf-8"))
@@ -658,7 +668,7 @@ def register() -> ToolModule:
                 return [TextContent(type="text", text="Error: Provide either md_content or md_file_path")]
 
             # Load markdown from file if path given
-            search_start = md_file_path or str(SHARED_DRIVE_ROOT)
+            search_start = md_file_path or str(_get_shared_drive_root())
             if md_file_path:
                 md_path = Path(md_file_path)
                 if not md_path.exists():
@@ -696,7 +706,7 @@ def register() -> ToolModule:
         elif name == "list_company_configs":
             configs = []
             for subdir in COMPANY_CONFIG_PATHS:
-                config_path = SHARED_DRIVE_ROOT / subdir / "company-config.json" if subdir else SHARED_DRIVE_ROOT / "company-config.json"
+                config_path = _get_shared_drive_root() / subdir / "company-config.json" if subdir else _get_shared_drive_root() / "company-config.json"
                 if config_path.exists():
                     try:
                         data = json.loads(config_path.read_text(encoding="utf-8"))

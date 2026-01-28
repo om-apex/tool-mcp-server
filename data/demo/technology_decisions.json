@@ -1,0 +1,28 @@
+{
+  "decisions": [
+    {
+      "id": "TECH-001",
+      "area": "Full-Stack Framework",
+      "date_decided": "2026-01-01",
+      "confidence": "High",
+      "decision": {
+        "frontend": {"framework": "Next.js 15", "styling": "Tailwind + Shadcn UI", "hosting": "Vercel"},
+        "backend": {"language": "Python", "framework": "FastAPI", "hosting": "Render"},
+        "database": {"primary": "Supabase (Postgres)"}
+      },
+      "rationale": "Modern stack with strong AI ecosystem support",
+      "company": "Acme AI Solutions"
+    },
+    {
+      "id": "TECH-002",
+      "area": "AI Agents",
+      "date_decided": "2026-01-05",
+      "confidence": "High",
+      "decision": "LangGraph for multi-agent orchestration",
+      "rationale": "Best fit for complex agent workflows with state management",
+      "company": "Acme AI Solutions"
+    }
+  ],
+  "last_updated": "2026-01-27",
+  "_demo_note": "Sample technology decisions for demonstration purposes."
+}

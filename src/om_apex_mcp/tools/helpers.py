@@ -1,47 +1,43 @@
 """Shared utilities for all tool modules."""
 
-import json
 import logging
-import os
-import platform
-from pathlib import Path
+from typing import Optional
+
+from ..storage import StorageBackend, LocalStorage
 
 logger = logging.getLogger("om-apex-mcp")
 
+# Global storage backend — initialized by server startup
+_backend: Optional[StorageBackend] = None
 
-def get_default_data_dir() -> Path:
-    """Get the default data directory based on platform."""
-    if platform.system() == "Darwin":
-        return Path.home() / "Library/CloudStorage/GoogleDrive-nishad@omapex.com/Shared drives/om-apex/mcp-data"
-    elif platform.system() == "Windows":
-        return Path("H:/Shared drives/om-apex/mcp-data")
-    else:
-        return Path(__file__).parent.parent.parent.parent / "data" / "context"
+# Relative path for daily progress within shared drive
+DAILY_PROGRESS_REL = "business-plan/06 HR and Admin/Daily Progress"
 
 
-DEFAULT_DATA_DIR = get_default_data_dir()
-DATA_DIR = Path(os.environ.get("OM_APEX_DATA_DIR", DEFAULT_DATA_DIR)).expanduser()
-SHARED_DRIVE_ROOT = DATA_DIR.parent
-DAILY_PROGRESS_DIR = SHARED_DRIVE_ROOT / "business-plan" / "06 HR and Admin" / "Daily Progress"
+def init_storage(backend: StorageBackend) -> None:
+    """Initialize the global storage backend. Called once at server startup."""
+    global _backend
+    _backend = backend
+    logger.info(f"Storage backend initialized: {type(backend).__name__}")
 
-logger.info(f"Using data directory: {DATA_DIR}")
-logger.info(f"Using daily progress directory: {DAILY_PROGRESS_DIR}")
+
+def get_backend() -> StorageBackend:
+    """Get the current storage backend, lazily initializing if needed."""
+    global _backend
+    if _backend is None:
+        _backend = LocalStorage()
+        logger.info("Storage backend auto-initialized to LocalStorage")
+    return _backend
 
 
 def load_json(filename: str) -> dict:
     """Load a JSON file from the data directory."""
-    filepath = DATA_DIR / filename
-    if filepath.exists():
-        with open(filepath, "r") as f:
-            return json.load(f)
-    return {}
+    return get_backend().load_json(filename)
 
 
 def save_json(filename: str, data: dict) -> None:
     """Save data to a JSON file in the data directory."""
-    filepath = DATA_DIR / filename
-    with open(filepath, "w") as f:
-        json.dump(data, f, indent=2)
+    get_backend().save_json(filename, data)
 
 
 def get_claude_instructions_data() -> dict:

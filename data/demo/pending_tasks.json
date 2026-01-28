@@ -1,0 +1,33 @@
+{
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "description": "Set up CI/CD pipeline for web application",
+      "category": "Technical",
+      "company": "Acme AI Solutions",
+      "priority": "High",
+      "status": "pending",
+      "created": "2026-01-20T10:00:00"
+    },
+    {
+      "id": "TASK-002",
+      "description": "Design landing page for Smart Warehouse System",
+      "category": "Marketing",
+      "company": "Acme AI Solutions",
+      "priority": "High",
+      "status": "in_progress",
+      "created": "2026-01-21T09:00:00"
+    },
+    {
+      "id": "TASK-003",
+      "description": "Review property management contract renewal",
+      "category": "Legal",
+      "company": "Acme Properties",
+      "priority": "Medium",
+      "status": "pending",
+      "created": "2026-01-22T14:00:00"
+    }
+  ],
+  "last_updated": "2026-01-27",
+  "_demo_note": "Sample tasks for demonstration purposes."
+}

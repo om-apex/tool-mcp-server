@@ -1,6 +1,6 @@
 [project]
 name = "om-apex-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server for Om Apex Holdings - persistent memory across Claude interfaces"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,12 +12,18 @@ dependencies = [
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "markdown>=3.5.0",
+    "starlette>=0.49.0",
+    "uvicorn>=0.34.0",
+    "sse-starlette>=2.0.0",
+    "google-api-python-client>=2.100.0",
+    "google-auth>=2.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
+    "httpx>=0.27.0",
 ]
 
 [build-system]
@@ -29,3 +35,4 @@ packages = ["src/om_apex_mcp"]
 
 [project.scripts]
 om-apex-mcp = "om_apex_mcp.server:main"
+om-apex-mcp-http = "om_apex_mcp.http_server:main"

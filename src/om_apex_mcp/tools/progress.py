@@ -8,7 +8,7 @@ from datetime import datetime
 from mcp.types import Tool, TextContent
 
 from . import ToolModule
-from .helpers import DAILY_PROGRESS_DIR
+from .helpers import get_backend, DAILY_PROGRESS_REL
 
 logger = logging.getLogger("om-apex-mcp")
 
@@ -63,23 +63,24 @@ def register() -> ToolModule:
     ]
 
     async def handler(name: str, arguments: dict):
+        backend = get_backend()
+
         if name == "get_daily_progress":
             date = arguments["date"]
 
-            if not DAILY_PROGRESS_DIR.exists():
-                return [TextContent(type="text", text=f"Daily Progress directory not found: {DAILY_PROGRESS_DIR}")]
-
-            exact_file = DAILY_PROGRESS_DIR / f"{date}.md"
-            if exact_file.exists():
-                with open(exact_file, "r", encoding="utf-8") as f:
-                    content = f.read()
+            # Try exact match
+            exact_path = f"{DAILY_PROGRESS_REL}/{date}.md"
+            content = backend.read_text(exact_path)
+            if content is not None:
                 return [TextContent(type="text", text=content)]
 
-            matching_files = list(DAILY_PROGRESS_DIR.glob(f"{date}*.md"))
-            if matching_files:
-                with open(matching_files[0], "r", encoding="utf-8") as f:
-                    content = f.read()
-                return [TextContent(type="text", text=f"File: {matching_files[0].name}\n\n{content}")]
+            # Try fuzzy match via listing
+            files = backend.list_files(DAILY_PROGRESS_REL, f"{date}*.md")
+            if files:
+                content = backend.read_text(files[0])
+                if content is not None:
+                    filename = files[0].rsplit("/", 1)[-1]
+                    return [TextContent(type="text", text=f"File: {filename}\n\n{content}")]
 
             return [TextContent(type="text", text=f"No daily progress log found for {date}")]
 
@@ -88,19 +89,15 @@ def register() -> ToolModule:
             interface = arguments["interface"].lower()
             title = arguments["title"]
 
-            DAILY_PROGRESS_DIR.mkdir(parents=True, exist_ok=True)
-
             today = datetime.now().strftime("%Y-%m-%d")
             timestamp = datetime.now().strftime("%I:%M %p EST").lstrip("0")
 
-            filepath = DAILY_PROGRESS_DIR / f"{today}.md"
+            filepath = f"{DAILY_PROGRESS_REL}/{today}.md"
 
             session_num = 1
-            existing_content = ""
+            existing_content = backend.read_text(filepath)
 
-            if filepath.exists():
-                with open(filepath, "r", encoding="utf-8") as f:
-                    existing_content = f.read()
+            if existing_content:
                 session_matches = re.findall(r"## Session (\d+)", existing_content)
                 if session_matches:
                     session_num = max(int(n) for n in session_matches) + 1
@@ -160,34 +157,36 @@ def register() -> ToolModule:
             session_entry = "".join(session_parts)
 
             if existing_content:
-                with open(filepath, "a", encoding="utf-8") as f:
-                    f.write(session_entry)
+                backend.append_text(filepath, session_entry)
             else:
                 file_header = f"# Daily Progress - {today}\n"
-                with open(filepath, "w", encoding="utf-8") as f:
-                    f.write(file_header + session_entry)
+                backend.write_text(filepath, file_header + session_entry)
 
-            return [TextContent(type="text", text=f"Daily progress logged successfully:\n- File: {filepath.name}\n- Session: {session_num}\n- Person: {person}\n- Interface: {interface}\n- Title: {title}")]
+            filename = filepath.rsplit("/", 1)[-1]
+            return [TextContent(type="text", text=f"Daily progress logged successfully:\n- File: {filename}\n- Session: {session_num}\n- Person: {person}\n- Interface: {interface}\n- Title: {title}")]
 
         elif name == "search_daily_progress":
             search_text = arguments["search_text"].lower()
             limit = arguments.get("limit", 10)
 
-            if not DAILY_PROGRESS_DIR.exists():
-                return [TextContent(type="text", text=f"Daily Progress directory not found: {DAILY_PROGRESS_DIR}")]
+            md_files = backend.list_files(DAILY_PROGRESS_REL, "*.md")
 
-            md_files = sorted(DAILY_PROGRESS_DIR.glob("*.md"), reverse=True)
+            if not md_files:
+                return [TextContent(type="text", text=f"No daily progress logs found")]
 
             results = []
             for filepath in md_files[:limit * 2]:
                 try:
-                    with open(filepath, "r", encoding="utf-8") as f:
-                        content = f.read()
+                    content = backend.read_text(filepath)
+                    if content is None:
+                        continue
 
                     if search_text in content.lower():
+                        filename = filepath.rsplit("/", 1)[-1]
+                        stem = filename.rsplit(".", 1)[0]
                         results.append({
-                            "file": filepath.name,
-                            "date": filepath.stem.split("_")[0] if "_" in filepath.stem else filepath.stem,
+                            "file": filename,
+                            "date": stem.split("_")[0] if "_" in stem else stem,
                             "content": content
                         })
 
@@ -201,11 +200,14 @@ def register() -> ToolModule:
                 results = []
                 for filepath in md_files[:limit]:
                     try:
-                        with open(filepath, "r", encoding="utf-8") as f:
-                            content = f.read()
+                        content = backend.read_text(filepath)
+                        if content is None:
+                            continue
+                        filename = filepath.rsplit("/", 1)[-1]
+                        stem = filename.rsplit(".", 1)[0]
                         results.append({
-                            "file": filepath.name,
-                            "date": filepath.stem.split("_")[0] if "_" in filepath.stem else filepath.stem,
+                            "file": filename,
+                            "date": stem.split("_")[0] if "_" in stem else stem,
                             "content": content
                         })
                     except Exception:

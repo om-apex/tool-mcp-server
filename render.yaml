@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: om-apex-mcp
+    runtime: docker
+    plan: starter
+    region: ohio
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: OM_APEX_API_KEY_NISHAD
+        sync: false
+      - key: OM_APEX_API_KEY_SUMEDHA
+        sync: false
+      - key: OM_APEX_DEMO_MODE
+        value: "true"
+      - key: GOOGLE_SERVICE_ACCOUNT_FILE
+        value: "/app/service-account.json"
+      - key: GOOGLE_SHARED_DRIVE_ID
+        sync: false

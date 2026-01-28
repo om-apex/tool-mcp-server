@@ -1,0 +1,17 @@
+{
+  "summary": {
+    "total_domains": 5,
+    "registrar": "Namecheap"
+  },
+  "tiers": {
+    "tier1_active_now": {
+      "domains": ["acmeholdings.com", "acmeproperties.com", "acmeaisolutions.com"],
+      "purpose": "Active company domains"
+    },
+    "tier2_future": {
+      "domains": ["acmewms.com", "acmeai.com"],
+      "purpose": "Reserved for future products"
+    }
+  },
+  "_demo_note": "Sample domain inventory for demonstration purposes."
+}
