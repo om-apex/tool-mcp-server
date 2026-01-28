@@ -18,7 +18,7 @@ from . import ToolModule
 from .helpers import get_backend
 from ..storage import LocalStorage
 
-READING = ["list_company_configs", "list_document_templates", "view_document_template"]
+READING = ["list_company_configs", "list_document_templates", "view_document_template", "get_brand_assets"]
 WRITING = ["generate_branded_html", "generate_company_document"]
 
 # Known company config locations relative to shared drive root
@@ -804,6 +804,20 @@ def register() -> ToolModule:
             inputSchema={"type": "object", "properties": {}, "required": []},
         ),
         Tool(
+            name="get_brand_assets",
+            description="Get the full brand assets for a company: colors, fonts, logo path, legal info, contact info. Example: get_brand_assets(company='Om Luxe Properties')",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "company": {
+                        "type": "string",
+                        "description": "Company name, e.g. 'Om Apex Holdings', 'Om AI Solutions', 'Om Luxe Properties', 'Om Supply Chain'",
+                    },
+                },
+                "required": ["company"],
+            },
+        ),
+        Tool(
             name="list_company_configs",
             description="List available company-config.json files with branding and legal info summary for document generation.",
             inputSchema={"type": "object", "properties": {}, "required": []},
@@ -955,6 +969,38 @@ def register() -> ToolModule:
                 return [TextContent(type="text", text="No .md templates found in document-templates/ folder.")]
 
             return [TextContent(type="text", text=json.dumps(templates, indent=2))]
+
+        elif name == "get_brand_assets":
+            company_name = arguments.get("company", "")
+            if not company_name:
+                return [TextContent(type="text", text="Error: 'company' is required.")]
+
+            config = _find_company_config_by_name(company_name)
+            if not config:
+                return [TextContent(type="text", text=f"Error: No company-config.json found for '{company_name}'")]
+
+            company = config.get("company", {})
+            brand = config.get("brand", {})
+            contact = config.get("contact", {})
+            legal = config.get("legal", {})
+
+            # Resolve logo path
+            logo_uri = _resolve_logo_path(config, str(_get_shared_drive_root()))
+            logo_path = Path(logo_uri)
+            if logo_path.is_absolute() and logo_path.exists():
+                logo_uri = logo_path.as_uri()
+
+            output = {
+                "company": company,
+                "brand": {
+                    **brand,
+                    "resolved_logo_uri": logo_uri,
+                },
+                "contact": contact,
+                "legal": legal,
+            }
+
+            return [TextContent(type="text", text=json.dumps(output, indent=2))]
 
         elif name == "list_company_configs":
             configs = []
