@@ -123,17 +123,27 @@ class GoogleDriveStorage(StorageBackend):
     """Google Drive API storage for remote access via service account."""
 
     def __init__(self):
+        import json as _json
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
 
+        # Support key as file path OR inline JSON (for Render/containers)
         creds_path = os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE")
-        if not creds_path:
-            raise ValueError("GOOGLE_SERVICE_ACCOUNT_FILE environment variable is required")
+        creds_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
 
-        creds = service_account.Credentials.from_service_account_file(
-            creds_path,
-            scopes=["https://www.googleapis.com/auth/drive"],
-        )
+        if creds_json:
+            info = _json.loads(creds_json)
+            creds = service_account.Credentials.from_service_account_info(
+                info,
+                scopes=["https://www.googleapis.com/auth/drive"],
+            )
+        elif creds_path:
+            creds = service_account.Credentials.from_service_account_file(
+                creds_path,
+                scopes=["https://www.googleapis.com/auth/drive"],
+            )
+        else:
+            raise ValueError("Set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_FILE")
         self.service = build("drive", "v3", credentials=creds)
 
         # Shared Drive ID — set via env var or auto-discover

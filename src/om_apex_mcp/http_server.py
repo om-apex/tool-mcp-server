@@ -36,7 +36,7 @@ def _create_storage_backend():
     1. Google Drive API (GOOGLE_SERVICE_ACCOUNT_FILE set)
     2. Local filesystem (default — for local dev or if Google Drive Desktop is available)
     """
-    if os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE"):
+    if os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON") or os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE"):
         logger.info("Using GoogleDriveStorage backend")
         return GoogleDriveStorage()
 
