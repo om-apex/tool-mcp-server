@@ -18,8 +18,8 @@ from . import ToolModule
 from .helpers import get_backend
 from ..storage import LocalStorage
 
-READING = ["list_company_configs"]
-WRITING = ["generate_branded_html"]
+READING = ["list_company_configs", "list_document_templates", "view_document_template"]
+WRITING = ["generate_branded_html", "generate_company_document"]
 
 # Known company config locations relative to shared drive root
 COMPANY_CONFIG_PATHS = [
@@ -82,8 +82,8 @@ def _default_config() -> dict:
             "tagline": "Intelligent backbone for your Business.",
         },
         "brand": {
-            "primary_color": "#1E4D7C",
-            "accent_color": "#C9A227",
+            "primary_color": "#C9A227",
+            "accent_color": "#1E4D7C",
             "secondary_text_color": "#9A9FB0",
             "body_text_color": "#2D2D2D",
             "heading_font": "Georgia, serif",
@@ -113,9 +113,20 @@ def _find_document_config(start_path: str) -> Optional[dict]:
 
 
 def _resolve_logo_path(config: dict, start_path: str) -> str:
-    """Resolve the logo path from brand-assets/ or by walking up directories."""
+    """Resolve the logo path from brand config or by walking up directories."""
     logo_filename = config["brand"]["logo"]
     logo_dir = config["brand"].get("logo_dir", "brand-assets")
+
+    # First, try logo_dir as relative to the shared drive root
+    try:
+        root = _get_shared_drive_root()
+        candidate = root / logo_dir / logo_filename
+        if candidate.exists():
+            return str(candidate.resolve())
+    except RuntimeError:
+        pass
+
+    # Fall back to walking up from start_path
     current = Path(start_path).resolve()
     if current.is_file():
         current = current.parent
@@ -150,29 +161,32 @@ def _build_header_html(config: dict, logo_uri: str) -> str:
     contact = config["contact"]
     company = config["company"]
 
-    return f"""<table class="hdr-table">
-      <tr>
-        <td class="hdr-left-cell">
-          <img src="{logo_uri}" alt="" style="height:48px;width:auto;">
-          <span style="font-family:{brand['heading_font']};font-weight:600;font-size:16px;color:{brand['primary_color']};letter-spacing:1px;line-height:1.2;">{company['display_name_line1']}<br>{company['display_name_line2']}</span>
-        </td>
-        <td class="hdr-right-cell">
-          <table>
-            <tr><td style="vertical-align:top;padding:0;"><svg width="10" height="10" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></td><td style="vertical-align:top;padding:0 0 0 4px;font-size:8px;color:{brand['secondary_text_color']};line-height:1.2;">{contact['address_line1']}<br>{contact['address_line2']}</td></tr>
-            <tr><td colspan="2" style="padding:1px 0;"><hr style="border:none;border-top:1px solid #D0D0D0;margin:0;"></td></tr>
-            <tr><td style="vertical-align:middle;padding:0;font-size:10px;color:{brand['secondary_text_color']};">&#x260E;</td><td style="vertical-align:middle;padding:0 0 0 4px;font-size:8px;color:{brand['secondary_text_color']};">{contact['phone']}</td></tr>
-          </table>
-        </td>
-      </tr>
-    </table>"""
+    return f"""<div class="doc-header-left">
+      <img class="doc-header-logo" src="{logo_uri}" alt="">
+      <span class="doc-header-company">{company['display_name_line1']}<br>{company['display_name_line2']}</span>
+    </div>
+    <div class="doc-header-address">
+      <table>
+        <tr style="vertical-align:top;">
+          <td><svg width="14" height="14" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg></td>
+          <td>{contact['address_line1']}<br>{contact['address_line2']}</td>
+        </tr>
+        <tr><td colspan="2" style="padding:1px 0;"><hr style="border:none;border-top:1px solid #D0D0D0;margin:0;"></td></tr>
+        <tr>
+          <td style="vertical-align:middle;">&#x260E;</td>
+          <td style="vertical-align:middle;">{contact['phone']}</td>
+        </tr>
+      </table>
+    </div>"""
 
 
 def _build_footer_html(config: dict) -> str:
     company = config["company"]
     footer_left = _build_footer_left(config)
 
-    return f"""<div class="ftr-left">{footer_left}</div>
-    <div class="ftr-center">{company['tagline']}</div>"""
+    return f"""<span class="doc-footer-left">{footer_left}</span>
+    <span class="doc-footer-tagline">{company['tagline']}</span>
+    <span class="doc-footer-page"></span>"""
 
 
 def _build_branded_css(config: dict) -> str:
@@ -206,20 +220,26 @@ def _build_branded_css(config: dict) -> str:
             top: 0;
             left: 0;
             right: 0;
-            height: 69px;
+            height: 80px;
             padding: 0 60px;
             background: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }}
         .page-footer-bar {{
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 6px 60px 10px 60px;
-            border-top: 2px solid {brand["accent_color"]};
+            padding: 8px 60px 20px 60px;
+            border-top: 1px solid {brand["accent_color"]};
             background: #fff;
-            font-size: 7px;
+            font-size: 10px;
             color: {brand["secondary_text_color"]};
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }}
     }}
 
@@ -232,63 +252,84 @@ def _build_branded_css(config: dict) -> str:
 
     /* ── Header styles ── */
     .page-header {{
-        border-bottom: 2px solid {brand["accent_color"]};
+        border-bottom: 1px solid {brand["accent_color"]};
         padding-bottom: 8px;
         margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 80px;
+        overflow: hidden;
     }}
-    .hdr-table {{
-        width: 100%;
+    .doc-header-left {{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }}
+    .doc-header-logo {{
+        height: 72px;
+        width: auto;
+    }}
+    .doc-header-company {{
+        font-family: {brand["heading_font"]};
+        font-weight: 600;
+        font-size: 18px;
+        color: {brand["primary_color"]};
+        letter-spacing: 1px;
+        line-height: 1.2;
+    }}
+    .doc-header-address {{
+        color: {brand["secondary_text_color"]};
+        font-size: 9px;
+        line-height: 1.2;
+    }}
+    .doc-header-address table {{
         border-collapse: collapse;
-        height: 100%;
     }}
-    .hdr-table td {{
-        border: none;
-        background: transparent;
-        vertical-align: middle;
-        padding: 0;
-    }}
-    .hdr-left-cell {{
+    .doc-header-address td {{
+        padding: 0 0 0 6px;
+        vertical-align: top;
         text-align: left;
-        white-space: nowrap;
-    }}
-    .hdr-left-cell img {{
-        vertical-align: middle;
-    }}
-    .hdr-left-cell span {{
-        vertical-align: middle;
-        padding-left: 10px;
-    }}
-    .hdr-right-cell {{
-        text-align: right;
-    }}
-    .hdr-right-cell table {{
-        float: right;
-        border-collapse: collapse;
-    }}
-    .hdr-right-cell table td {{
         border: none;
         background: transparent;
-        padding: 0;
+    }}
+    .doc-header-address td:first-child {{
+        padding-left: 0;
+        font-size: 12px;
     }}
 
     /* ── Footer bar ── */
     .page-footer-bar {{
-        border-top: 2px solid {brand["accent_color"]};
-        padding-top: 6px;
+        border-top: 1px solid {brand["accent_color"]};
+        padding-top: 8px;
         margin-top: 30px;
-    }}
-    .ftr-left {{
-        font-size: 7px;
-        line-height: 1.1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         color: {brand["secondary_text_color"]};
-        display: inline;
+        font-size: 10px;
     }}
-    .ftr-center {{
+    .doc-footer-left {{
+        flex: 1;
+        text-align: left;
+        line-height: 1.2;
+        font-size: 8px;
+    }}
+    .doc-footer-tagline {{
+        flex: 1;
+        text-align: center;
         font-style: italic;
-        font-size: 11px;
-        color: {brand["secondary_text_color"]};
-        display: inline;
-        float: right;
+        font-size: 12px;
+    }}
+    .doc-footer-page {{
+        flex: 1;
+        text-align: right;
+        white-space: nowrap;
+    }}
+    @media print {{
+        .doc-footer-page::after {{
+            content: counter(page);
+        }}
     }}
 
     /* ── Cover page ── */
@@ -580,6 +621,69 @@ def _auto_link_toc(html: str) -> str:
     )
 
 
+def _resolve_template_variables(content: str, config: dict) -> str:
+    """Replace {{variable}} placeholders in content using company config.
+
+    Supported variables (all drawn from company-config.json):
+      {{company_name}}          - company.name
+      {{company_name_upper}}    - company.name in UPPERCASE
+      {{company_short_name}}    - company.short_name
+      {{parent_company_name}}   - company.subsidiary_of (or company.name if parent)
+      {{tagline}}               - company.tagline
+      {{date}}                  - current date in MM/DD/YYYY
+      {{formation_date}}        - legal.formation_date
+      {{manager_name}}          - legal.manager_name
+      {{registered_address}}    - legal.registered_address
+      {{registered_agent}}      - legal.registered_agent
+      {{state}}                 - legal.state
+      {{capital_contribution}}  - legal.capital_contribution
+      {{business_purpose}}      - legal.business_purpose
+      {{address_line1}}         - contact.address_line1
+      {{address_line2}}         - contact.address_line2
+      {{phone}}                 - contact.phone
+      {{email}}                 - contact.email
+      {{website}}               - contact.website
+    """
+    from datetime import datetime
+
+    company = config.get("company", {})
+    legal = config.get("legal", {})
+    contact = config.get("contact", {})
+
+    parent_name = company.get("subsidiary_of") or company.get("name", "")
+
+    variables = {
+        "company_name": company.get("name", ""),
+        "company_name_upper": company.get("name", "").upper(),
+        "company_short_name": company.get("short_name", ""),
+        "parent_company_name": parent_name,
+        "tagline": company.get("tagline", ""),
+        "date": datetime.now().strftime("%m/%d/%Y"),
+        "formation_date": legal.get("formation_date", "___________"),
+        "manager_name": legal.get("manager_name", "___________"),
+        "registered_address": legal.get("registered_address", "___________"),
+        "registered_agent": legal.get("registered_agent", "___________"),
+        "state": legal.get("state", "___________"),
+        "capital_contribution": legal.get("capital_contribution", "___________"),
+        "business_purpose": legal.get("business_purpose", "___________"),
+        "control_number": legal.get("control_number", "___________"),
+        "ein": legal.get("ein", "___________"),
+        "address_line1": contact.get("address_line1", ""),
+        "address_line2": contact.get("address_line2", ""),
+        "phone": contact.get("phone", ""),
+        "email": contact.get("email", ""),
+        "website": contact.get("website", ""),
+    }
+
+    for key, value in variables.items():
+        # Use blank-line placeholder if value is empty
+        if not value:
+            value = "___________"
+        content = content.replace("{{" + key + "}}", value)
+
+    return content
+
+
 def _markdown_to_branded_html(
     md_content: str,
     config: dict,
@@ -587,6 +691,9 @@ def _markdown_to_branded_html(
     doc_config: Optional[dict] = None,
 ) -> str:
     """Convert markdown content to branded HTML with header/footer."""
+    # Resolve {{variable}} placeholders from company config
+    md_content = _resolve_template_variables(md_content, config)
+
     css = _build_branded_css(config)
     header_html = _build_header_html(config, logo_uri)
     footer_html = _build_footer_html(config)
@@ -651,8 +758,54 @@ def register() -> ToolModule:
             },
         ),
         Tool(
+            name="generate_company_document",
+            description=(
+                "Generate a branded HTML document from a template for a specific company. "
+                "Templates live in document-templates/ on the shared drive. "
+                "All {{variables}} in the template are resolved from the company's config. "
+                "Example: generate_company_document(template='Operating-Agreement-Template', company='Om Luxe Properties')"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "template": {
+                        "type": "string",
+                        "description": "Template name (without .md extension) from the document-templates/ folder, e.g. 'Operating-Agreement-Template'",
+                    },
+                    "company": {
+                        "type": "string",
+                        "description": "Company name, e.g. 'Om Luxe Properties', 'Om AI Solutions', 'Om Supply Chain', 'Om Apex Holdings'",
+                    },
+                    "output_folder": {
+                        "type": "string",
+                        "description": "Output folder relative to shared drive root (optional, defaults to 'business-plan/01 Legal')",
+                    },
+                },
+                "required": ["template", "company"],
+            },
+        ),
+        Tool(
+            name="view_document_template",
+            description="View the contents of a document template, showing all {{variables}} and their placement. Example: view_document_template(template='Operating-Agreement-Template')",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "template": {
+                        "type": "string",
+                        "description": "Template name (without .md extension), e.g. 'Operating-Agreement-Template'",
+                    },
+                },
+                "required": ["template"],
+            },
+        ),
+        Tool(
+            name="list_document_templates",
+            description="List available document templates from the document-templates/ folder on the shared drive.",
+            inputSchema={"type": "object", "properties": {}, "required": []},
+        ),
+        Tool(
             name="list_company_configs",
-            description="List available company-config.json files with branding summary for document generation.",
+            description="List available company-config.json files with branding and legal info summary for document generation.",
             inputSchema={"type": "object", "properties": {}, "required": []},
         ),
     ]
@@ -703,6 +856,106 @@ def register() -> ToolModule:
 
             return [TextContent(type="text", text=f"HTML generated successfully: {output_path}\n\nOpen in browser and use Print (Cmd+P) -> Save as PDF for final output.")]
 
+        elif name == "generate_company_document":
+            template_name = arguments.get("template", "")
+            company_name = arguments.get("company", "")
+            output_folder = arguments.get("output_folder", "business-plan/01 Legal")
+
+            if not template_name or not company_name:
+                return [TextContent(type="text", text="Error: Both 'template' and 'company' are required.")]
+
+            # Load template
+            root = _get_shared_drive_root()
+            template_path = root / "document-templates" / f"{template_name}.md"
+            if not template_path.exists():
+                # Try without assuming .md was stripped
+                template_path = root / "document-templates" / template_name
+                if not template_path.exists():
+                    available = [f.stem for f in (root / "document-templates").glob("*.md")]
+                    return [TextContent(type="text", text=f"Error: Template not found: {template_name}\nAvailable: {', '.join(available)}")]
+
+            md_content = template_path.read_text(encoding="utf-8")
+
+            # Load company config
+            config = _find_company_config_by_name(company_name)
+            if not config:
+                return [TextContent(type="text", text=f"Error: No company-config.json found for '{company_name}'")]
+
+            # Resolve logo
+            logo_uri = _resolve_logo_path(config, str(template_path))
+            logo_path = Path(logo_uri)
+            if logo_path.is_absolute() and logo_path.exists():
+                logo_uri = logo_path.as_uri()
+
+            # Build output filename: strip "-Template" suffix for final documents
+            short = config["company"].get("short_name", company_name).replace(" ", "-")
+            doc_name = re.sub(r"-?Template$", "", template_name)
+            output_filename = f"{short}-{doc_name}.html"
+            output_dir = root / output_folder
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / output_filename
+
+            # Find optional document-config.json
+            doc_config = _find_document_config(str(template_path))
+
+            try:
+                html_output = _markdown_to_branded_html(md_content, config, logo_uri, doc_config)
+            except Exception as e:
+                return [TextContent(type="text", text=f"Error generating HTML: {e}")]
+
+            output_path.write_text(html_output, encoding="utf-8")
+
+            return [TextContent(type="text", text=(
+                f"Document generated successfully!\n\n"
+                f"Company: {config['company']['name']}\n"
+                f"Template: {template_name}\n"
+                f"Output: {output_path}\n\n"
+                f"Open in browser and use Print (Cmd+P) → Save as PDF."
+            ))]
+
+        elif name == "view_document_template":
+            template_name = arguments.get("template", "")
+            if not template_name:
+                return [TextContent(type="text", text="Error: 'template' is required.")]
+
+            root = _get_shared_drive_root()
+            template_path = root / "document-templates" / f"{template_name}.md"
+            if not template_path.exists():
+                template_path = root / "document-templates" / template_name
+                if not template_path.exists():
+                    available = [f.stem for f in (root / "document-templates").glob("*.md")]
+                    return [TextContent(type="text", text=f"Error: Template not found: {template_name}\nAvailable: {', '.join(available)}")]
+
+            content = template_path.read_text(encoding="utf-8")
+
+            # Extract all {{variables}} used
+            variables = sorted(set(re.findall(r"\{\{(\w+)\}\}", content)))
+
+            return [TextContent(type="text", text=(
+                f"**Template:** {template_path.name}\n\n"
+                f"**Variables used ({len(variables)}):** {', '.join(variables)}\n\n"
+                f"---\n\n{content}"
+            ))]
+
+        elif name == "list_document_templates":
+            root = _get_shared_drive_root()
+            templates_dir = root / "document-templates"
+            if not templates_dir.exists():
+                return [TextContent(type="text", text="No document-templates/ folder found on shared drive.")]
+
+            templates = []
+            for f in sorted(templates_dir.glob("*.md")):
+                templates.append({
+                    "name": f.stem,
+                    "filename": f.name,
+                    "path": str(f),
+                })
+
+            if not templates:
+                return [TextContent(type="text", text="No .md templates found in document-templates/ folder.")]
+
+            return [TextContent(type="text", text=json.dumps(templates, indent=2))]
+
         elif name == "list_company_configs":
             configs = []
             for subdir in COMPANY_CONFIG_PATHS:
@@ -712,6 +965,7 @@ def register() -> ToolModule:
                         data = json.loads(config_path.read_text(encoding="utf-8"))
                         company = data.get("company", {})
                         brand = data.get("brand", {})
+                        legal = data.get("legal", {})
                         configs.append({
                             "path": str(config_path),
                             "company_name": company.get("name", "Unknown"),
@@ -720,6 +974,9 @@ def register() -> ToolModule:
                             "primary_color": brand.get("primary_color", ""),
                             "accent_color": brand.get("accent_color", ""),
                             "logo": brand.get("logo", ""),
+                            "state": legal.get("state", ""),
+                            "ein": legal.get("ein", ""),
+                            "formation_date": legal.get("formation_date", ""),
                         })
                     except Exception:
                         continue
