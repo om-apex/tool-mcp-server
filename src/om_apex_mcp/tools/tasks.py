@@ -47,11 +47,12 @@ def register() -> ToolModule:
         ),
         Tool(
             name="complete_task",
-            description="Mark a task as completed",
+            description="Mark a task as completed with optional completion notes",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "task_id": {"type": "string", "description": "The task ID (e.g., TASK-001)"},
+                    "notes": {"type": "string", "description": "Completion notes - what was done, outcome, follow-up needed (optional)"},
                 },
                 "required": ["task_id"],
             },
@@ -154,11 +155,19 @@ def register() -> ToolModule:
             data = load_json("pending_tasks.json")
             tasks = data.get("tasks", [])
             task_id = arguments["task_id"]
+            completion_notes = arguments.get("notes")
 
             for task in tasks:
                 if task.get("id") == task_id:
                     task["status"] = "completed"
                     task["completed_at"] = datetime.now().isoformat()
+                    if completion_notes:
+                        # Append to existing notes or create new
+                        existing_notes = task.get("notes", "")
+                        if existing_notes:
+                            task["notes"] = f"{existing_notes}\n\n[Completed] {completion_notes}"
+                        else:
+                            task["notes"] = f"[Completed] {completion_notes}"
                     data["tasks"] = tasks
                     data["last_updated"] = datetime.now().strftime("%Y-%m-%d")
                     save_json("pending_tasks.json", data)
