@@ -18,7 +18,7 @@ from mcp.types import Tool, TextContent
 from .storage import StorageBackend, LocalStorage
 from .tools import ToolModule
 from .tools.helpers import init_storage
-from .tools import context, tasks, progress, documents
+from .tools import context, tasks, progress, documents, calendar
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -44,20 +44,23 @@ def create_server(backend: Optional[StorageBackend] = None) -> Server:
     _task_mod = tasks.register()
     _progress_mod = progress.register()
     _documents_mod = documents.register()
+    _calendar_mod = calendar.register()
 
     # Build global tool lists for get_full_context response
     _all_reading = (
         context.READING + _task_mod.reading_tools
         + _progress_mod.reading_tools + _documents_mod.reading_tools
+        + _calendar_mod.reading_tools
     )
     _all_writing = (
         context.WRITING + _task_mod.writing_tools
         + _progress_mod.writing_tools + _documents_mod.writing_tools
+        + _calendar_mod.writing_tools
     )
 
     _context_mod = context.register(_all_reading, _all_writing)
 
-    modules: list[ToolModule] = [_context_mod, _task_mod, _progress_mod, _documents_mod]
+    modules: list[ToolModule] = [_context_mod, _task_mod, _progress_mod, _documents_mod, _calendar_mod]
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
