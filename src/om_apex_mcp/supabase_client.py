@@ -19,17 +19,21 @@ _supabase_client = None
 
 
 def _get_config_path() -> Path:
-    """Get path to centralized config folder."""
+    """Get path to centralized config folder.
+
+    Uses .env.supabase.omapex-dashboard for Om Apex Holdings internal tools.
+    The old .env.supabase file is now used only by AI Quorum.
+    """
     if platform.system() == "Darwin":
-        return Path.home() / "om-apex/config/.env.supabase"
+        return Path.home() / "om-apex/config/.env.supabase.omapex-dashboard"
     elif platform.system() == "Windows":
-        return Path("C:/Users/14042/om-apex/config/.env.supabase")
+        return Path("C:/Users/14042/om-apex/config/.env.supabase.omapex-dashboard")
     else:
         # Linux/other - check common locations
-        home_config = Path.home() / "om-apex/config/.env.supabase"
+        home_config = Path.home() / "om-apex/config/.env.supabase.omapex-dashboard"
         if home_config.exists():
             return home_config
-        return Path("/etc/om-apex/.env.supabase")
+        return Path("/etc/om-apex/.env.supabase.omapex-dashboard")
 
 
 def get_supabase_client():
