@@ -2,6 +2,10 @@
 
 Provides database access for tasks and decisions, replacing JSON file storage.
 Loads credentials from centralized config folder.
+
+Includes resilience features:
+- Configurable timeout (default 10s)
+- HTTP/1.1 fallback for environments with HTTP/2 issues
 """
 
 import logging
@@ -16,6 +20,9 @@ logger = logging.getLogger("om-apex-mcp")
 
 # Global client instance
 _supabase_client = None
+
+# Timeout for Supabase operations (seconds)
+SUPABASE_TIMEOUT = int(os.environ.get("SUPABASE_TIMEOUT", "10"))
 
 
 def _get_config_path() -> Path:
@@ -62,10 +69,33 @@ def get_supabase_client():
         logger.warning("Supabase credentials not found - falling back to JSON storage")
         return None
 
+    # Strip any whitespace from the key (can happen with copy/paste)
+    key = key.strip().replace("\n", "").replace(" ", "")
+
     try:
         from supabase import create_client
-        _supabase_client = create_client(url, key)
-        logger.info("Supabase client initialized successfully")
+        from supabase.lib.client_options import ClientOptions
+        import httpx
+
+        # Configure httpx with timeout and HTTP/1.1 (more reliable than HTTP/2 in some envs)
+        # HTTP/2 can cause stream reset errors in containerized environments
+        http_client = httpx.Client(
+            timeout=httpx.Timeout(SUPABASE_TIMEOUT),
+            http2=False,  # Use HTTP/1.1 for reliability
+        )
+
+        options = ClientOptions(
+            postgrest_client_timeout=SUPABASE_TIMEOUT,
+        )
+
+        _supabase_client = create_client(url, key, options=options)
+
+        # Replace the internal httpx client with our configured one
+        # This ensures timeout and HTTP/1.1 settings are applied
+        if hasattr(_supabase_client, 'postgrest') and hasattr(_supabase_client.postgrest, '_client'):
+            _supabase_client.postgrest._client = http_client
+
+        logger.info(f"Supabase client initialized (timeout={SUPABASE_TIMEOUT}s, http2=False)")
         return _supabase_client
     except Exception as e:
         logger.error(f"Failed to create Supabase client: {e}")
