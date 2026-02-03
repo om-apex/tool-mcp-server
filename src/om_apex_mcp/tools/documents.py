@@ -1122,84 +1122,107 @@ def register() -> ToolModule:
             if not template_name:
                 return [TextContent(type="text", text="Error: 'template' is required.")]
 
-            # Try Supabase first if not using local storage
-            if _use_supabase_for_templates():
-                # Normalize template name to ID format
-                template_id = template_name.lower().replace(" ", "-")
-                if not template_id.endswith("-template"):
-                    template_id = f"{template_id}-template"
+            # Normalize template name to ID format for Supabase lookup
+            template_id = template_name.lower().replace(" ", "-")
 
-                template = sb_get_template(template_id)
+            # Try local storage first if available
+            local_found = False
+            if _is_local_storage():
+                try:
+                    root = _get_shared_drive_root()
+                    template_path = root / "document-templates" / f"{template_name}.md"
+                    if not template_path.exists():
+                        template_path = root / "document-templates" / template_name
+                    if template_path.exists():
+                        local_found = True
+                        content = template_path.read_text(encoding="utf-8")
+                        variables = sorted(set(re.findall(r"\{\{(\w+)\}\}", content)))
+                        return [TextContent(type="text", text=(
+                            f"**Template:** {template_path.name} (local)\n\n"
+                            f"**Variables used ({len(variables)}):** {', '.join(variables)}\n\n"
+                            f"---\n\n{content}"
+                        ))]
+                except RuntimeError:
+                    pass
+
+            # Try Supabase (either as primary or fallback)
+            if is_supabase_available():
+                # Try with -template suffix
+                if not template_id.endswith("-template"):
+                    template = sb_get_template(f"{template_id}-template")
+                else:
+                    template = sb_get_template(template_id)
+
+                # Try without -template suffix if not found
                 if not template:
-                    # Try without -template suffix
-                    template = sb_get_template(template_name.lower().replace(" ", "-"))
+                    template = sb_get_template(template_id.replace("-template", ""))
+
+                # Try exact ID as given
+                if not template:
+                    template = sb_get_template(template_id)
 
                 if template:
                     content = template["content"]
                     variables = template.get("variables", []) or sorted(set(re.findall(r"\{\{(\w+)\}\}", content)))
+                    source = "supabase"
                     return [TextContent(type="text", text=(
-                        f"**Template:** {template['filename']}\n\n"
+                        f"**Template:** {template['filename']} ({source})\n\n"
                         f"**Variables used ({len(variables)}):** {', '.join(variables)}\n\n"
                         f"---\n\n{content}"
                     ))]
 
+            # Not found in either location - gather available templates
+            available = []
+            if _is_local_storage():
+                try:
+                    root = _get_shared_drive_root()
+                    available.extend([f.stem for f in (root / "document-templates").glob("*.md")])
+                except RuntimeError:
+                    pass
+            if is_supabase_available():
                 templates = sb_get_templates()
-                available = [t["name"] for t in templates]
-                return [TextContent(type="text", text=f"Error: Template not found: {template_name}\nAvailable: {', '.join(available)}")]
+                available.extend([t["name"] for t in templates if t["name"] not in available])
 
-            # Fall back to local storage
-            try:
-                root = _get_shared_drive_root()
-            except RuntimeError as e:
-                return [TextContent(type="text", text=f"Error: {e}")]
-
-            template_path = root / "document-templates" / f"{template_name}.md"
-            if not template_path.exists():
-                template_path = root / "document-templates" / template_name
-                if not template_path.exists():
-                    available = [f.stem for f in (root / "document-templates").glob("*.md")]
-                    return [TextContent(type="text", text=f"Error: Template not found: {template_name}\nAvailable: {', '.join(available)}")]
-
-            content = template_path.read_text(encoding="utf-8")
-
-            # Extract all {{variables}} used
-            variables = sorted(set(re.findall(r"\{\{(\w+)\}\}", content)))
-
-            return [TextContent(type="text", text=(
-                f"**Template:** {template_path.name}\n\n"
-                f"**Variables used ({len(variables)}):** {', '.join(variables)}\n\n"
-                f"---\n\n{content}"
-            ))]
+            return [TextContent(type="text", text=f"Error: Template not found: {template_name}\nAvailable: {', '.join(available) if available else 'None'}")]
 
         elif name == "list_document_templates":
-            # Try Supabase first if not using local storage
-            if _use_supabase_for_templates():
-                templates = sb_get_templates()
-                if templates:
-                    result = [{"name": t["name"], "filename": t["filename"], "id": t["id"]} for t in templates]
-                    return [TextContent(type="text", text=json.dumps(result, indent=2))]
-                return [TextContent(type="text", text="No templates found in Supabase. Use sync_templates_to_supabase to upload templates.")]
-
-            # Fall back to local storage
-            try:
-                root = _get_shared_drive_root()
-            except RuntimeError as e:
-                return [TextContent(type="text", text=f"Error: {e}. Templates not available without local storage or Supabase.")]
-
-            templates_dir = root / "document-templates"
-            if not templates_dir.exists():
-                return [TextContent(type="text", text="No document-templates/ folder found on shared drive.")]
-
             templates = []
-            for f in sorted(templates_dir.glob("*.md")):
-                templates.append({
-                    "name": f.stem,
-                    "filename": f.name,
-                    "path": str(f),
-                })
+            local_names = set()
+
+            # Get local templates if available
+            if _is_local_storage():
+                try:
+                    root = _get_shared_drive_root()
+                    templates_dir = root / "document-templates"
+                    if templates_dir.exists():
+                        for f in sorted(templates_dir.glob("*.md")):
+                            templates.append({
+                                "name": f.stem,
+                                "filename": f.name,
+                                "source": "local",
+                                "path": str(f),
+                            })
+                            local_names.add(f.stem.lower())
+                except RuntimeError:
+                    pass
+
+            # Also get Supabase templates (include those not in local)
+            if is_supabase_available():
+                sb_templates = sb_get_templates()
+                for t in sb_templates:
+                    # Only add if not already in local list
+                    if t["name"].lower() not in local_names:
+                        templates.append({
+                            "name": t["name"],
+                            "filename": t["filename"],
+                            "source": "supabase",
+                            "id": t["id"],
+                        })
 
             if not templates:
-                return [TextContent(type="text", text="No .md templates found in document-templates/ folder.")]
+                if not _is_local_storage() and not is_supabase_available():
+                    return [TextContent(type="text", text="Error: No storage available. Neither local storage nor Supabase is configured.")]
+                return [TextContent(type="text", text="No templates found in local storage or Supabase.")]
 
             return [TextContent(type="text", text=json.dumps(templates, indent=2))]
 
