@@ -305,3 +305,160 @@ def get_task_count() -> dict:
         "completed": len(completed),
         "high_priority": len(high_priority),
     }
+
+
+# =============================================================================
+# Document Template Operations
+# =============================================================================
+
+def get_document_templates() -> list[dict]:
+    """Get all document templates from Supabase.
+
+    Returns:
+        List of template dictionaries with id, name, filename, content, variables.
+    """
+    client = get_supabase_client()
+    if not client:
+        return []
+
+    try:
+        response = client.table("document_templates").select("*").order("name").execute()
+        return response.data or []
+    except Exception as e:
+        logger.warning(f"Could not fetch document_templates: {e}")
+        return []
+
+
+def get_document_template(template_id: str) -> Optional[dict]:
+    """Get a single document template by ID.
+
+    Args:
+        template_id: Template ID (e.g., 'operating-agreement-template')
+
+    Returns:
+        Template dictionary or None if not found.
+    """
+    client = get_supabase_client()
+    if not client:
+        return None
+
+    try:
+        response = client.table("document_templates").select("*").eq("id", template_id).execute()
+        return response.data[0] if response.data else None
+    except Exception as e:
+        logger.warning(f"Could not fetch template {template_id}: {e}")
+        return None
+
+
+def upsert_document_template(template: dict) -> dict:
+    """Insert or update a document template in Supabase.
+
+    Args:
+        template: Template dict with id, name, filename, content, etc.
+
+    Returns:
+        The upserted template.
+    """
+    client = get_supabase_client()
+    if not client:
+        raise RuntimeError("Supabase not available")
+
+    response = client.table("document_templates").upsert(template).execute()
+    return response.data[0] if response.data else template
+
+
+def has_document_templates_table() -> bool:
+    """Check if document_templates table exists and is accessible."""
+    client = get_supabase_client()
+    if not client:
+        return False
+
+    try:
+        client.table("document_templates").select("id").limit(1).execute()
+        return True
+    except Exception:
+        return False
+
+
+# =============================================================================
+# Company Config Operations
+# =============================================================================
+
+def get_company_configs() -> list[dict]:
+    """Get all company configs from Supabase.
+
+    Returns:
+        List of config dictionaries with id, company_name, short_name, config (JSONB).
+    """
+    client = get_supabase_client()
+    if not client:
+        return []
+
+    try:
+        response = client.table("company_configs").select("*").order("company_name").execute()
+        return response.data or []
+    except Exception as e:
+        logger.warning(f"Could not fetch company_configs: {e}")
+        return []
+
+
+def get_company_config(company_name: str) -> Optional[dict]:
+    """Get a company config by name (case-insensitive partial match).
+
+    Args:
+        company_name: Company name to search for
+
+    Returns:
+        Config dictionary or None if not found.
+    """
+    client = get_supabase_client()
+    if not client:
+        return None
+
+    try:
+        # Try exact match first
+        response = client.table("company_configs").select("*").ilike("company_name", company_name).execute()
+        if response.data:
+            return response.data[0]
+
+        # Try short_name match
+        response = client.table("company_configs").select("*").ilike("short_name", company_name).execute()
+        if response.data:
+            return response.data[0]
+
+        # Try partial match
+        response = client.table("company_configs").select("*").ilike("company_name", f"%{company_name}%").execute()
+        return response.data[0] if response.data else None
+    except Exception as e:
+        logger.warning(f"Could not fetch config for {company_name}: {e}")
+        return None
+
+
+def upsert_company_config(config: dict) -> dict:
+    """Insert or update a company config in Supabase.
+
+    Args:
+        config: Config dict with id, company_name, short_name, config (JSONB).
+
+    Returns:
+        The upserted config.
+    """
+    client = get_supabase_client()
+    if not client:
+        raise RuntimeError("Supabase not available")
+
+    response = client.table("company_configs").upsert(config).execute()
+    return response.data[0] if response.data else config
+
+
+def has_company_configs_table() -> bool:
+    """Check if company_configs table exists and is accessible."""
+    client = get_supabase_client()
+    if not client:
+        return False
+
+    try:
+        client.table("company_configs").select("id").limit(1).execute()
+        return True
+    except Exception:
+        return False

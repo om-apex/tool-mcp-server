@@ -3,6 +3,10 @@
 Approach (TECH-038, TECH-039, TECH-040):
   Generate multi-page HTML where each logical page section has branded header/footer.
   The HTML is opened in a browser and printed to PDF (Cmd+P -> Save as PDF).
+
+Storage modes (TASK-164):
+  - Local: Templates and configs read from Google Drive shared folder
+  - Supabase: Templates and configs read from Supabase (for cloud/remote access)
 """
 
 import json
@@ -17,9 +21,20 @@ from mcp.types import Tool, TextContent
 from . import ToolModule
 from .helpers import get_backend
 from ..storage import LocalStorage
+from ..supabase_client import (
+    is_supabase_available,
+    get_document_templates as sb_get_templates,
+    get_document_template as sb_get_template,
+    upsert_document_template as sb_upsert_template,
+    get_company_configs as sb_get_configs,
+    get_company_config as sb_get_config,
+    upsert_company_config as sb_upsert_config,
+    has_document_templates_table,
+    has_company_configs_table,
+)
 
 READING = ["list_company_configs", "list_document_templates", "view_document_template", "get_brand_assets"]
-WRITING = ["generate_branded_html", "generate_company_document"]
+WRITING = ["generate_branded_html", "generate_company_document", "sync_templates_to_supabase"]
 
 # Known company config locations relative to shared drive root
 COMPANY_CONFIG_PATHS = [
@@ -30,13 +45,33 @@ COMPANY_CONFIG_PATHS = [
 ]
 
 
+def _is_local_storage() -> bool:
+    """Check if we're using local storage (has filesystem access)."""
+    backend = get_backend()
+    return isinstance(backend, LocalStorage)
+
+
 def _get_shared_drive_root() -> Path:
     """Get the shared drive root from the current storage backend."""
     backend = get_backend()
     if isinstance(backend, LocalStorage):
         return backend.shared_drive_root
-    # For non-local backends, documents module is not supported (local-only feature)
-    raise RuntimeError("Document generation is only supported with local storage")
+    # For non-local backends, this will fail - callers should check _is_local_storage() first
+    raise RuntimeError("Local storage not available - use Supabase for templates")
+
+
+def _use_supabase_for_templates() -> bool:
+    """Check if we should use Supabase for templates (non-local or Supabase available)."""
+    if _is_local_storage():
+        return False  # Prefer local when available
+    return is_supabase_available() and has_document_templates_table()
+
+
+def _use_supabase_for_configs() -> bool:
+    """Check if we should use Supabase for company configs."""
+    if _is_local_storage():
+        return False  # Prefer local when available
+    return is_supabase_available() and has_company_configs_table()
 
 
 def _find_company_config(start_path: str) -> dict:
@@ -55,9 +90,24 @@ def _find_company_config(start_path: str) -> dict:
 
 
 def _find_company_config_by_name(company: str) -> Optional[dict]:
-    """Find company-config.json by company name from known paths."""
+    """Find company-config.json by company name from known paths or Supabase."""
+    # Try Supabase first if not using local storage
+    if _use_supabase_for_configs():
+        config_row = sb_get_config(company)
+        if config_row:
+            return config_row.get("config", {})
+
+    # Fall back to local storage
+    if not _is_local_storage():
+        return None
+
+    try:
+        root = _get_shared_drive_root()
+    except RuntimeError:
+        return None
+
     for subdir in COMPANY_CONFIG_PATHS:
-        config_path = _get_shared_drive_root() / subdir / "company-config.json" if subdir else _get_shared_drive_root() / "company-config.json"
+        config_path = root / subdir / "company-config.json" if subdir else root / "company-config.json"
         if config_path.exists():
             try:
                 config = json.loads(config_path.read_text(encoding="utf-8"))
@@ -822,6 +872,11 @@ def register() -> ToolModule:
             description="List available company-config.json files with branding and legal info summary for document generation.",
             inputSchema={"type": "object", "properties": {}, "required": []},
         ),
+        Tool(
+            name="sync_templates_to_supabase",
+            description="Sync document templates and company configs from local Google Drive to Supabase for remote access. Only works when local storage is available.",
+            inputSchema={"type": "object", "properties": {}, "required": []},
+        ),
     ]
 
     async def handler(name: str, arguments: dict):
@@ -878,61 +933,144 @@ def register() -> ToolModule:
             if not template_name or not company_name:
                 return [TextContent(type="text", text="Error: Both 'template' and 'company' are required.")]
 
-            # Load template
-            root = _get_shared_drive_root()
-            template_path = root / "document-templates" / f"{template_name}.md"
-            if not template_path.exists():
-                # Try without assuming .md was stripped
-                template_path = root / "document-templates" / template_name
-                if not template_path.exists():
-                    available = [f.stem for f in (root / "document-templates").glob("*.md")]
-                    return [TextContent(type="text", text=f"Error: Template not found: {template_name}\nAvailable: {', '.join(available)}")]
+            md_content = None
+            template_source = "local"
 
-            md_content = template_path.read_text(encoding="utf-8")
+            # Try Supabase first if not using local storage
+            if _use_supabase_for_templates():
+                # Normalize template name to ID format
+                template_id = template_name.lower().replace(" ", "-")
+                if not template_id.endswith("-template"):
+                    template_id = f"{template_id}-template"
+
+                template = sb_get_template(template_id)
+                if not template:
+                    # Try without -template suffix
+                    template = sb_get_template(template_name.lower().replace(" ", "-"))
+
+                if template:
+                    md_content = template["content"]
+                    template_source = "supabase"
+                else:
+                    templates = sb_get_templates()
+                    available = [t["name"] for t in templates]
+                    return [TextContent(type="text", text=f"Error: Template not found: {template_name}\nAvailable in Supabase: {', '.join(available)}")]
+
+            # Fall back to local storage
+            if md_content is None:
+                if not _is_local_storage():
+                    return [TextContent(type="text", text="Error: Templates not available - no local storage and Supabase templates not found.")]
+
+                root = _get_shared_drive_root()
+                template_path = root / "document-templates" / f"{template_name}.md"
+                if not template_path.exists():
+                    # Try without assuming .md was stripped
+                    template_path = root / "document-templates" / template_name
+                    if not template_path.exists():
+                        available = [f.stem for f in (root / "document-templates").glob("*.md")]
+                        return [TextContent(type="text", text=f"Error: Template not found: {template_name}\nAvailable: {', '.join(available)}")]
+
+                md_content = template_path.read_text(encoding="utf-8")
 
             # Load company config
             config = _find_company_config_by_name(company_name)
             if not config:
                 return [TextContent(type="text", text=f"Error: No company-config.json found for '{company_name}'")]
 
-            # Resolve logo
-            logo_uri = _resolve_logo_path(config, str(template_path))
-            logo_path = Path(logo_uri)
-            if logo_path.is_absolute() and logo_path.exists():
-                logo_uri = logo_path.as_uri()
+            # Resolve logo (only meaningful for local storage)
+            logo_uri = config.get("brand", {}).get("logo", "")
+            if _is_local_storage():
+                try:
+                    root = _get_shared_drive_root()
+                    logo_uri = _resolve_logo_path(config, str(root / "document-templates"))
+                    logo_path = Path(logo_uri)
+                    if logo_path.is_absolute() and logo_path.exists():
+                        logo_uri = logo_path.as_uri()
+                except RuntimeError:
+                    pass
 
             # Build output filename: strip "-Template" suffix for final documents
             short = config["company"].get("short_name", company_name).replace(" ", "-")
             doc_name = re.sub(r"-?Template$", "", template_name)
             output_filename = f"{short}-{doc_name}.html"
-            output_dir = root / output_folder
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / output_filename
 
-            # Find optional document-config.json
-            doc_config = _find_document_config(str(template_path))
+            # For local storage, write to filesystem; for remote, return HTML content
+            if _is_local_storage():
+                root = _get_shared_drive_root()
+                output_dir = root / output_folder
+                output_dir.mkdir(parents=True, exist_ok=True)
+                output_path = output_dir / output_filename
 
-            try:
-                html_output = _markdown_to_branded_html(md_content, config, logo_uri, doc_config)
-            except Exception as e:
-                return [TextContent(type="text", text=f"Error generating HTML: {e}")]
+                # Find optional document-config.json
+                doc_config = _find_document_config(str(root / "document-templates"))
 
-            output_path.write_text(html_output, encoding="utf-8")
+                try:
+                    html_output = _markdown_to_branded_html(md_content, config, logo_uri, doc_config)
+                except Exception as e:
+                    return [TextContent(type="text", text=f"Error generating HTML: {e}")]
 
-            return [TextContent(type="text", text=(
-                f"Document generated successfully!\n\n"
-                f"Company: {config['company']['name']}\n"
-                f"Template: {template_name}\n"
-                f"Output: {output_path}\n\n"
-                f"Open in browser and use Print (Cmd+P) → Save as PDF."
-            ))]
+                output_path.write_text(html_output, encoding="utf-8")
+
+                return [TextContent(type="text", text=(
+                    f"Document generated successfully!\n\n"
+                    f"Company: {config['company']['name']}\n"
+                    f"Template: {template_name} (from {template_source})\n"
+                    f"Output: {output_path}\n\n"
+                    f"Open in browser and use Print (Cmd+P) → Save as PDF."
+                ))]
+            else:
+                # Non-local: generate HTML and return it (can't write to filesystem)
+                try:
+                    html_output = _markdown_to_branded_html(md_content, config, logo_uri, None)
+                except Exception as e:
+                    return [TextContent(type="text", text=f"Error generating HTML: {e}")]
+
+                return [TextContent(type="text", text=(
+                    f"Document generated (template from {template_source})!\n\n"
+                    f"Company: {config['company']['name']}\n"
+                    f"Template: {template_name}\n"
+                    f"Suggested filename: {output_filename}\n\n"
+                    f"Note: Running in remote mode - cannot write to filesystem.\n"
+                    f"HTML content returned below. Save it locally and open in browser for Print-to-PDF.\n\n"
+                    f"---HTML START---\n{html_output}\n---HTML END---"
+                ))]
 
         elif name == "view_document_template":
             template_name = arguments.get("template", "")
             if not template_name:
                 return [TextContent(type="text", text="Error: 'template' is required.")]
 
-            root = _get_shared_drive_root()
+            # Try Supabase first if not using local storage
+            if _use_supabase_for_templates():
+                # Normalize template name to ID format
+                template_id = template_name.lower().replace(" ", "-")
+                if not template_id.endswith("-template"):
+                    template_id = f"{template_id}-template"
+
+                template = sb_get_template(template_id)
+                if not template:
+                    # Try without -template suffix
+                    template = sb_get_template(template_name.lower().replace(" ", "-"))
+
+                if template:
+                    content = template["content"]
+                    variables = template.get("variables", []) or sorted(set(re.findall(r"\{\{(\w+)\}\}", content)))
+                    return [TextContent(type="text", text=(
+                        f"**Template:** {template['filename']}\n\n"
+                        f"**Variables used ({len(variables)}):** {', '.join(variables)}\n\n"
+                        f"---\n\n{content}"
+                    ))]
+
+                templates = sb_get_templates()
+                available = [t["name"] for t in templates]
+                return [TextContent(type="text", text=f"Error: Template not found: {template_name}\nAvailable: {', '.join(available)}")]
+
+            # Fall back to local storage
+            try:
+                root = _get_shared_drive_root()
+            except RuntimeError as e:
+                return [TextContent(type="text", text=f"Error: {e}")]
+
             template_path = root / "document-templates" / f"{template_name}.md"
             if not template_path.exists():
                 template_path = root / "document-templates" / template_name
@@ -952,7 +1090,20 @@ def register() -> ToolModule:
             ))]
 
         elif name == "list_document_templates":
-            root = _get_shared_drive_root()
+            # Try Supabase first if not using local storage
+            if _use_supabase_for_templates():
+                templates = sb_get_templates()
+                if templates:
+                    result = [{"name": t["name"], "filename": t["filename"], "id": t["id"]} for t in templates]
+                    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+                return [TextContent(type="text", text="No templates found in Supabase. Use sync_templates_to_supabase to upload templates.")]
+
+            # Fall back to local storage
+            try:
+                root = _get_shared_drive_root()
+            except RuntimeError as e:
+                return [TextContent(type="text", text=f"Error: {e}. Templates not available without local storage or Supabase.")]
+
             templates_dir = root / "document-templates"
             if not templates_dir.exists():
                 return [TextContent(type="text", text="No document-templates/ folder found on shared drive.")]
@@ -984,11 +1135,16 @@ def register() -> ToolModule:
             contact = config.get("contact", {})
             legal = config.get("legal", {})
 
-            # Resolve logo path
-            logo_uri = _resolve_logo_path(config, str(_get_shared_drive_root()))
-            logo_path = Path(logo_uri)
-            if logo_path.is_absolute() and logo_path.exists():
-                logo_uri = logo_path.as_uri()
+            # Resolve logo path (only for local storage)
+            logo_uri = brand.get("logo", "")
+            if _is_local_storage():
+                try:
+                    logo_uri = _resolve_logo_path(config, str(_get_shared_drive_root()))
+                    logo_path = Path(logo_uri)
+                    if logo_path.is_absolute() and logo_path.exists():
+                        logo_uri = logo_path.as_uri()
+                except RuntimeError:
+                    pass  # Non-local, keep original logo filename
 
             output = {
                 "company": company,
@@ -1003,9 +1159,40 @@ def register() -> ToolModule:
             return [TextContent(type="text", text=json.dumps(output, indent=2))]
 
         elif name == "list_company_configs":
+            # Try Supabase first if not using local storage
+            if _use_supabase_for_configs():
+                configs = sb_get_configs()
+                if configs:
+                    result = []
+                    for c in configs:
+                        data = c.get("config", {})
+                        company = data.get("company", {})
+                        brand = data.get("brand", {})
+                        legal = data.get("legal", {})
+                        result.append({
+                            "id": c["id"],
+                            "company_name": c["company_name"],
+                            "short_name": c.get("short_name", ""),
+                            "is_parent": company.get("is_parent", False),
+                            "primary_color": brand.get("primary_color", ""),
+                            "accent_color": brand.get("accent_color", ""),
+                            "logo": brand.get("logo", ""),
+                            "state": legal.get("state", ""),
+                            "ein": legal.get("ein", ""),
+                            "formation_date": legal.get("formation_date", ""),
+                        })
+                    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+                return [TextContent(type="text", text="No company configs in Supabase. Use sync_templates_to_supabase to upload configs.")]
+
+            # Fall back to local storage
+            try:
+                root = _get_shared_drive_root()
+            except RuntimeError as e:
+                return [TextContent(type="text", text=f"Error: {e}")]
+
             configs = []
             for subdir in COMPANY_CONFIG_PATHS:
-                config_path = _get_shared_drive_root() / subdir / "company-config.json" if subdir else _get_shared_drive_root() / "company-config.json"
+                config_path = root / subdir / "company-config.json" if subdir else root / "company-config.json"
                 if config_path.exists():
                     try:
                         data = json.loads(config_path.read_text(encoding="utf-8"))
@@ -1031,6 +1218,62 @@ def register() -> ToolModule:
                 return [TextContent(type="text", text="No company-config.json files found in known paths.")]
 
             return [TextContent(type="text", text=json.dumps(configs, indent=2))]
+
+        elif name == "sync_templates_to_supabase":
+            if not _is_local_storage():
+                return [TextContent(type="text", text="Error: sync_templates_to_supabase requires local storage access.")]
+
+            if not is_supabase_available():
+                return [TextContent(type="text", text="Error: Supabase is not configured.")]
+
+            root = _get_shared_drive_root()
+            results = {"templates_synced": [], "configs_synced": [], "errors": []}
+
+            # Sync document templates
+            templates_dir = root / "document-templates"
+            if templates_dir.exists():
+                for f in templates_dir.glob("*.md"):
+                    try:
+                        content = f.read_text(encoding="utf-8")
+                        variables = sorted(set(re.findall(r"\{\{(\w+)\}\}", content)))
+                        template_id = f.stem.lower().replace(" ", "-")
+                        template = {
+                            "id": template_id,
+                            "name": f.stem,
+                            "filename": f.name,
+                            "content": content,
+                            "variables": variables,
+                        }
+                        sb_upsert_template(template)
+                        results["templates_synced"].append(f.stem)
+                    except Exception as e:
+                        results["errors"].append(f"Template {f.name}: {e}")
+
+            # Sync company configs
+            for subdir in COMPANY_CONFIG_PATHS:
+                config_path = root / subdir / "company-config.json" if subdir else root / "company-config.json"
+                if config_path.exists():
+                    try:
+                        data = json.loads(config_path.read_text(encoding="utf-8"))
+                        company_name = data.get("company", {}).get("name", "Unknown")
+                        short_name = data.get("company", {}).get("short_name", "")
+                        config_id = short_name.lower().replace(" ", "-") if short_name else company_name.lower().replace(" ", "-")
+                        config_row = {
+                            "id": config_id,
+                            "company_name": company_name,
+                            "short_name": short_name,
+                            "config": data,
+                        }
+                        sb_upsert_config(config_row)
+                        results["configs_synced"].append(company_name)
+                    except Exception as e:
+                        results["errors"].append(f"Config {config_path.name}: {e}")
+
+            summary = f"Synced {len(results['templates_synced'])} templates and {len(results['configs_synced'])} configs to Supabase."
+            if results["errors"]:
+                summary += f"\n\nErrors ({len(results['errors'])}):\n" + "\n".join(results["errors"])
+
+            return [TextContent(type="text", text=summary + "\n\n" + json.dumps(results, indent=2))]
 
         return None
 
