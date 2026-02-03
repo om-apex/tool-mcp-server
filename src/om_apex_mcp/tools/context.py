@@ -1,7 +1,9 @@
-"""Context tools: company, tech, domains, decisions, instructions, full_context."""
+"""Context tools: company, tech, domains, decisions, instructions, full_context, cli_status."""
 
 import json
+import subprocess
 from datetime import datetime
+from pathlib import Path
 
 from mcp.types import Tool, TextContent
 
@@ -29,6 +31,7 @@ READING = [
     "get_technology_decisions",
     "get_decisions_history",
     "get_domain_inventory",
+    "get_cli_status",
 ]
 
 WRITING = [
@@ -93,6 +96,11 @@ def register(all_reading_tools: list[str], all_writing_tools: list[str]) -> Tool
                 "required": [],
             },
         ),
+        Tool(
+            name="get_cli_status",
+            description="Get status of all external service CLIs (Render, Supabase, Vercel, Cloudflare, GitHub, Google Cloud, HubSpot) including auth status and example commands",
+            inputSchema={"type": "object", "properties": {}, "required": []},
+        ),
     ]
 
     async def handler(name: str, arguments: dict):
@@ -119,89 +127,27 @@ def register(all_reading_tools: list[str], all_writing_tools: list[str]) -> Tool
             return [TextContent(type="text", text=json.dumps(instructions, indent=2))]
 
         elif name == "get_full_context":
-            company = load_json("company_structure.json")
-            domains = load_json("domain_inventory.json")
-
             # Use Supabase for tasks/decisions if available
             if _use_supabase():
                 task_counts = get_task_count()
                 pending_count = task_counts["pending"] + task_counts["in_progress"]
                 high_priority_count = task_counts["high_priority"]
-
-                # Get high priority tasks for display
-                all_tasks = sb_get_tasks()
-                high_priority_tasks = [
-                    t for t in all_tasks
-                    if t.get("priority") == "High" and t.get("status") != "completed"
-                ]
-
-                decisions_list = sb_get_decisions()
             else:
-                # Fallback to JSON files
-                decisions_data = load_json("technology_decisions.json")
-                decisions_list = decisions_data.get("decisions", [])
                 tasks_data = load_json("pending_tasks.json")
                 all_tasks = tasks_data.get("tasks", [])
                 pending_tasks = [t for t in all_tasks if t.get("status") != "completed"]
                 pending_count = len(pending_tasks)
-                high_priority_tasks = [t for t in pending_tasks if t.get("priority") == "High"]
-                high_priority_count = len(high_priority_tasks)
+                high_priority_count = len([t for t in pending_tasks if t.get("priority") == "High"])
 
-            display_text = f"""Full context loaded.
-
-**Quick Summary:** {pending_count} pending tasks ({high_priority_count} high priority)
-
-How can I help you today?"""
-
-            instructions = get_claude_instructions_data()
-
-            # Find tech stack from decisions (usually TECH-002)
-            tech_stack_decision = next(
-                (d for d in decisions_list if d.get("area") == "Technology Stack"),
-                {}
-            )
-            tech_decision = tech_stack_decision.get("decision", {})
-            if isinstance(tech_decision, str):
-                tech_decision = {}
-
+            # Minimal summary - Claude Code has CLAUDE.md for detailed instructions
             summary = {
-                "CRITICAL_INSTRUCTION": {
-                    "action": "OUTPUT ONLY THE TEXT BELOW - NOTHING ELSE",
-                    "output": display_text,
-                    "rules": [
-                        "Do NOT list tasks, decisions, tech stack, domains, or any other details",
-                        "Do NOT explain what was loaded or summarize the context",
-                        "Do NOT add any additional greeting or pleasantries",
-                        "Just output the 3 lines shown in 'output' above, exactly as written"
-                    ]
-                },
-                "behavioral_instructions": instructions,
-                "available_tools": {
-                    "reading": all_reading_tools,
-                    "writing": all_writing_tools
-                },
-                "company_overview": {
-                    "holding_company": company.get("holding_company", {}).get("name"),
-                    "subsidiaries": [s.get("name") for s in company.get("subsidiaries", [])],
-                    "owners": list(company.get("holding_company", {}).get("ownership", {}).keys())
-                },
-                "tech_stack": {
-                    "frontend": tech_decision.get("frontend", {}),
-                    "backend": tech_decision.get("backend", {}),
-                    "database": tech_decision.get("database", {})
-                },
-                "domains": {
-                    "total": domains.get("summary", {}).get("total_domains"),
-                    "active": domains.get("tiers", {}).get("tier1_active_now", {}).get("domains", [])
-                },
-                "tasks": {
-                    "total_pending": pending_count,
-                    "high_priority": high_priority_count,
-                    "high_priority_tasks": [{"id": t.get("id"), "description": t.get("description")} for t in high_priority_tasks]
-                }
+                "status": "ready",
+                "tasks": {"pending": pending_count, "high_priority": high_priority_count},
+                "companies": ["Om Apex Holdings", "Om Luxe Properties", "Om AI Solutions"],
+                "tools": {"reading": len(all_reading_tools), "writing": len(all_writing_tools)},
             }
 
-            return [TextContent(type="text", text=json.dumps(summary, indent=2))]
+            return [TextContent(type="text", text=json.dumps(summary))]
 
         elif name == "add_decision":
             # Use Supabase if available
@@ -277,6 +223,70 @@ How can I help you today?"""
                 decisions = [d for d in decisions if d.get("company", "").lower() == company.lower()]
 
             return [TextContent(type="text", text=json.dumps(decisions, indent=2))]
+
+        elif name == "get_cli_status":
+            def check_cli(cmd: list, success_indicator: str = None) -> dict:
+                """Run a CLI command and return status."""
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                    output = result.stdout + result.stderr
+                    if result.returncode == 0:
+                        return {"status": "ok", "output": output.strip()[:200]}
+                    return {"status": "error", "output": output.strip()[:200]}
+                except FileNotFoundError:
+                    return {"status": "not_installed"}
+                except subprocess.TimeoutExpired:
+                    return {"status": "timeout"}
+                except Exception as e:
+                    return {"status": "error", "error": str(e)}
+
+            # Load Cloudflare token for testing
+            cf_token = ""
+            cf_config = Path.home() / "om-apex/config/.env.cloudflare"
+            if cf_config.exists():
+                for line in cf_config.read_text().splitlines():
+                    if line.startswith("CLOUDFLARE_API_TOKEN="):
+                        cf_token = line.split("=", 1)[1].strip()
+
+            cli_status = {
+                "render": {
+                    "version": check_cli(["render", "--version"]),
+                    "auth": check_cli(["render", "whoami"]),
+                    "examples": ["render services -o json", "render logs -r <service-id> --limit 50"],
+                },
+                "supabase": {
+                    "version": check_cli(["supabase", "--version"]),
+                    "auth": check_cli(["supabase", "projects", "list"]),
+                    "examples": ["supabase projects list", "supabase db push --linked"],
+                },
+                "vercel": {
+                    "version": check_cli(["vercel", "--version"]),
+                    "auth": check_cli(["vercel", "whoami"]),
+                    "examples": ["vercel ls --yes", "vercel env ls"],
+                },
+                "github": {
+                    "version": check_cli(["gh", "--version"]),
+                    "auth": check_cli(["gh", "auth", "status"]),
+                    "examples": ["gh pr list", "gh issue list", "gh api repos/{owner}/{repo}"],
+                },
+                "gcloud": {
+                    "version": check_cli(["gcloud", "--version"]),
+                    "auth": check_cli(["gcloud", "auth", "list", "--filter=status:ACTIVE", "--format=value(account)"]),
+                    "examples": ["gcloud projects list", "gcloud auth login"],
+                },
+                "cloudflare": {
+                    "version": check_cli(["wrangler", "--version"]),
+                    "auth": {"status": "ok" if cf_token else "not_configured", "note": "Uses CLOUDFLARE_API_TOKEN from config"},
+                    "examples": ["CLOUDFLARE_API_TOKEN=... wrangler whoami", "curl with Bearer token for API"],
+                },
+                "hubspot": {
+                    "version": check_cli(["hs", "--version"]),
+                    "auth": check_cli(["hs", "account", "list"]),
+                    "examples": ["hs account auth (interactive)", "hs account list"],
+                },
+            }
+
+            return [TextContent(type="text", text=json.dumps(cli_status, indent=2))]
 
         return None
 
