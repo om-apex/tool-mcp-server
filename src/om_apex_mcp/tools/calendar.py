@@ -136,6 +136,10 @@ def register() -> ToolModule:
     ]
 
     async def handler(name: str, arguments: dict) -> Optional[list[TextContent]]:
+        # Only handle calendar tools — return None for anything else
+        if name not in ("list_calendar_events", "create_calendar_event", "delete_calendar_event"):
+            return None
+
         try:
             service = get_calendar_service()
         except Exception as e:
