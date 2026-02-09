@@ -590,6 +590,120 @@ def has_company_configs_table() -> bool:
         return False
 
 
+# =============================================================================
+# Session Handoff Operations
+# =============================================================================
+
+def get_session_handoff() -> Optional[dict]:
+    """Get the current session handoff from Supabase.
+
+    Returns:
+        Handoff dictionary with content, created_by, interface, timestamps.
+        None if no handoff exists or Supabase unavailable.
+    """
+    try:
+        client = get_supabase_client()
+        if not client:
+            logger.debug("get_session_handoff: Supabase not available")
+            return None
+
+        response = client.table("session_handoff").select("*").eq("id", 1).execute()
+        if response.data:
+            return response.data[0]
+        return None
+    except Exception as e:
+        logger.error(f"Error fetching session handoff: {e}")
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
+        return None
+
+
+def save_session_handoff(content: str, created_by: str, interface: str) -> dict:
+    """Save (upsert) the session handoff to Supabase.
+
+    Archives the previous handoff to history before overwriting.
+
+    Args:
+        content: Full markdown handoff content.
+        created_by: Who wrote this ("Nishad" or "Sumedha").
+        interface: Which Claude interface ("code", "chat", "cowork", "code-app").
+
+    Returns:
+        The saved handoff record.
+
+    Raises:
+        RuntimeError: If Supabase is not available or save fails.
+    """
+    try:
+        client = get_supabase_client()
+        if not client:
+            raise RuntimeError("Supabase not available - cannot save handoff")
+
+        # Archive previous handoff to history
+        try:
+            existing = client.table("session_handoff").select("*").eq("id", 1).execute()
+            if existing.data:
+                old = existing.data[0]
+                from datetime import datetime
+                client.table("session_handoff_history").insert({
+                    "content": old["content"],
+                    "created_by": old["created_by"],
+                    "interface": old["interface"],
+                    "session_date": old.get("updated_at", datetime.now().isoformat())[:10],
+                }).execute()
+                logger.info("Previous handoff archived to history")
+        except Exception as archive_err:
+            logger.warning(f"Could not archive previous handoff: {archive_err}")
+
+        # Upsert current handoff
+        from datetime import datetime
+        handoff = {
+            "id": 1,
+            "content": content,
+            "created_by": created_by,
+            "interface": interface,
+            "updated_at": datetime.now().isoformat(),
+        }
+
+        response = client.table("session_handoff").upsert(handoff).execute()
+        if response.data:
+            logger.info(f"Session handoff saved by {created_by} via {interface}")
+            return response.data[0]
+        return handoff
+    except RuntimeError:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving session handoff: {e}")
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
+        raise RuntimeError(f"Failed to save handoff: {e}") from e
+
+
+def get_handoff_history(limit: int = 10) -> list[dict]:
+    """Get previous session handoffs from history.
+
+    Args:
+        limit: Max number of records to return.
+
+    Returns:
+        List of historical handoff records, newest first.
+    """
+    try:
+        client = get_supabase_client()
+        if not client:
+            return []
+
+        response = (
+            client.table("session_handoff_history")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return response.data or []
+    except Exception as e:
+        logger.error(f"Error fetching handoff history: {e}")
+        return []
+
+
 def delete_document_template(template_id: str) -> bool:
     """Delete a document template from Supabase.
 

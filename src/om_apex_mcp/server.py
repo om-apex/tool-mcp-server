@@ -42,7 +42,7 @@ try:
     from .storage import StorageBackend, LocalStorage
     from .tools import ToolModule
     from .tools.helpers import init_storage
-    from .tools import context, tasks, progress, documents, calendar
+    from .tools import context, tasks, progress, documents, calendar, handoff
 except ImportError as e:
     logger.critical(f"Failed to import local modules: {e}")
     logger.critical(f"Traceback:\n{traceback.format_exc()}")
@@ -127,6 +127,16 @@ def create_server(backend: Optional[StorageBackend] = None) -> Server:
         logger.error(f"Traceback:\n{traceback.format_exc()}")
         _calendar_mod = None
 
+    # Handoff module
+    try:
+        _handoff_mod = handoff.register()
+        modules.append(_handoff_mod)
+        logger.info(f"Handoff module loaded ({len(_handoff_mod.tools)} tools)")
+    except Exception as e:
+        logger.error(f"Failed to load handoff module: {e}")
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
+        _handoff_mod = None
+
     # Phase 4: Build tool lists and register context module
     try:
         _all_reading = context.READING.copy()
@@ -144,6 +154,9 @@ def create_server(backend: Optional[StorageBackend] = None) -> Server:
         if _calendar_mod:
             _all_reading += _calendar_mod.reading_tools
             _all_writing += _calendar_mod.writing_tools
+        if _handoff_mod:
+            _all_reading += _handoff_mod.reading_tools
+            _all_writing += _handoff_mod.writing_tools
 
         _context_mod = context.register(_all_reading, _all_writing)
         modules.insert(0, _context_mod)  # Context module first
