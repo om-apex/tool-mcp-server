@@ -1,6 +1,6 @@
 # CLI Access Reference
 
-> Last updated: 2026-02-09
+> Last updated: 2026-02-12
 
 ## Installed CLIs
 
@@ -167,13 +167,69 @@ When creating a new Supabase project or new local dev project:
 - [ ] Add port assignment to this doc (Local Development Ports table)
 - [ ] Test OAuth login flow locally before deploying
 
+## Diagnostic Scripts
+
+### Model Connectivity Test (ping_models.py)
+
+**Location:** `products/ai-quorum/backend/scripts/ping_models.py`
+
+Standalone script to verify connectivity to all AI model providers. Sends a minimal prompt ("Reply with exactly: PONG") to each provider and reports status, latency, and response. Does not modify any application code or state.
+
+**Usage:**
+```bash
+cd ~/om-apex/products/ai-quorum/backend
+
+# Ping all 5 providers in parallel
+OM_APEX_CONFIG_DIR=~/om-apex/config python scripts/ping_models.py
+
+# Ping a single provider
+python scripts/ping_models.py openai
+python scripts/ping_models.py anthropic
+python scripts/ping_models.py google
+python scripts/ping_models.py xai
+python scripts/ping_models.py perplexity
+```
+
+**Models tested:**
+
+| Provider | Model ID | Friendly Name |
+|----------|----------|---------------|
+| OpenAI | `openai/gpt-4o` | GPT-4o |
+| Anthropic | `anthropic/claude-3-5-sonnet-20241022` | Claude Sonnet 4.5 |
+| Google | `google/gemini-2.0-flash-001` | Gemini 2.0 Flash |
+| xAI | `x-ai/grok-4-1-fast-reasoning` | Grok 4 Fast |
+| Perplexity | `perplexity/sonar-pro` | Sonar Pro |
+
+**Requirements:** `OM_APEX_CONFIG_DIR` env var set (points to `~/om-apex/config/`) or API keys in `backend/.env`
+
+**Example output:**
+```
+Pinging 5 model(s)...
+
+Model                                      Status   Latency    Response
+------------------------------------------------------------------------------------------
+  GPT-4o (OpenAI)                          OK       491ms      PONG
+  Claude Sonnet 4.5 (Anthropic)            OK       1829ms     PONG
+  Gemini 2.0 Flash (Google)                OK       581ms      PONG
+  Grok 4 Fast (xAI)                        OK       2152ms     PONG
+  Sonar Pro (Perplexity)                   OK       1508ms     PONG
+
+Result: 5/5 models responding
+```
+
+**When to use:**
+- Before a demo — verify all models are reachable
+- After API key rotation — confirm new keys work
+- When models are timing out in production — isolate connectivity vs application issues
+- After deploy — sanity check backend can reach all providers
+
 ## Gotchas
 
 1. **Owner Portal Supabase** — NOT linked locally. Must use temp dir workaround (see above)
 2. **Owner Portal IDs** — `companies` table uses TEXT ids (slugs like `"om-apex-holdings"`), NOT BIGSERIAL
 3. **Owner Portal migrations** — Old ones use non-timestamp names (001, 002, etc.) — `migration repair` fails on these
 4. **Never delete a `cd` target directory** in current session — breaks Bash tool permanently
-5. **AI Quorum backend** — uses OpenRouter for LLM calls, not direct provider APIs
+5. **AI Quorum backend** — uses direct provider APIs (OpenAI, Anthropic, Google, xAI, Perplexity). OpenRouter is legacy/fallback only
 6. **Cloudflare** — requires token from env: `CLOUDFLARE_API_TOKEN=$(grep CLOUDFLARE_API_TOKEN ~/om-apex/config/.env.cloudflare | cut -d= -f2) wrangler whoami`
 7. **Google Cloud** — may need `gcloud auth login` to refresh tokens
 8. **OAuth redirects to production from localhost** — Missing localhost in Supabase Auth redirect URLs. See "Local Development Setup Checklist" above
