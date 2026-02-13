@@ -1,6 +1,6 @@
 # Database Schema Quick Reference
 
-> Last updated: 2026-02-09
+> Last updated: 2026-02-13
 
 ## Owner Portal (hympgocuivzxzxllgmcy)
 
@@ -209,3 +209,114 @@ Per-user settings.
 
 ### Additional Config Tables (orch_*)
 The orchestration engine has several config tables for stages, model slots, prompt templates, and taxonomy. These are seeded via migrations and rarely queried directly. See migration files in `products/ai-quorum/supabase/migrations/` for full schema.
+
+---
+
+## Om Cortex (sgcfettixymowtokytwk)
+
+### cortex_sessions
+One row per conversation session.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| user_id | TEXT | Default `'owner'` |
+| channel | TEXT | `web`, `api`, etc. |
+| session_key | TEXT | Unique, client-provided |
+| metadata | JSONB | Extensible metadata |
+| created_at | TIMESTAMPTZ | Auto |
+| updated_at | TIMESTAMPTZ | Auto |
+
+### cortex_turns
+Append-only conversation log.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| session_id | UUID FK | References cortex_sessions(id) |
+| role | TEXT | `user`, `assistant`, `tool_call`, `tool_result` |
+| content | TEXT | Message content (nullable) |
+| metadata | JSONB | Tool params, etc. |
+| tokens_in | INT | Input tokens |
+| tokens_out | INT | Output tokens |
+| cost_usd | NUMERIC(10,6) | Estimated cost |
+| created_at | TIMESTAMPTZ | Auto |
+
+Index: `idx_turns_session` on `(session_id, created_at)`
+
+### cortex_audit_log
+Every action logged.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| session_id | UUID | Nullable |
+| action | TEXT | `chat.message`, `tool.executed`, `tool.denied`, etc. |
+| tool | TEXT | Tool name (nullable) |
+| params | JSONB | Tool parameters |
+| result | JSONB | Tool result or error |
+| channel | TEXT | Source channel |
+| triggered_by | TEXT | `user`, `cron`, or `agent` |
+| created_at | TIMESTAMPTZ | Auto |
+
+Index: `idx_audit_created` on `(created_at desc)`
+
+### cortex_conversations (Phase 1)
+Vector-searchable conversation archive. Auto-populated after each agent run.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| session_id | UUID FK | References cortex_sessions(id), unique index |
+| user_id | TEXT | Default `'owner'` |
+| channel | TEXT | Source channel |
+| title | TEXT | First sentence of Haiku summary |
+| summary | TEXT | Full Haiku-generated summary |
+| embedding | VECTOR(1536) | OpenAI text-embedding-3-small |
+| tags | TEXT[] | Haiku-generated tags |
+| turn_count | INT | Number of turns |
+| created_at | TIMESTAMPTZ | Auto |
+| updated_at | TIMESTAMPTZ | Auto |
+
+Unique index: `idx_conversations_session` on `(session_id)`
+
+### cortex_knowledge (Phase 1)
+User-saved notes and documents with vector embeddings.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| user_id | TEXT | Default `'owner'` |
+| type | TEXT | `note`, `document`, etc. |
+| title | TEXT | Note title |
+| content | TEXT | Full content |
+| embedding | VECTOR(1536) | OpenAI text-embedding-3-small |
+| source | TEXT | Origin of content |
+| metadata | JSONB | Tags and other metadata |
+| created_at | TIMESTAMPTZ | Auto |
+
+### cortex_memory (Phase 1)
+Key-value working memory. Facts auto-extracted from conversations.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| user_id | TEXT | Default `'owner'` |
+| key | TEXT | Unique key |
+| value | TEXT | Stored value |
+| confidence | FLOAT | Default 0.8 |
+| source_conversation_id | UUID FK | References cortex_conversations(id) |
+| created_at | TIMESTAMPTZ | Auto |
+| updated_at | TIMESTAMPTZ | Auto |
+
+Unique constraint on `key`.
+
+### RPC Functions (Phase 1)
+
+**match_conversations(query_embedding, match_threshold, match_count)**
+Returns: `(id UUID, title TEXT, summary TEXT, similarity FLOAT)`
+Uses `1 - (embedding <=> query_embedding)` for cosine similarity.
+
+**match_knowledge(query_embedding, match_threshold, match_count)**
+Returns: `(id UUID, title TEXT, content TEXT, type TEXT, similarity FLOAT)`
+Uses `1 - (embedding <=> query_embedding)` for cosine similarity.
