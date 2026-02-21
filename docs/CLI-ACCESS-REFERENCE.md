@@ -1,6 +1,6 @@
 # CLI Access Reference
 
-> Last updated: 2026-02-12
+> Last updated: 2026-02-21
 
 ## Installed CLIs
 
@@ -20,6 +20,7 @@
 |---------|-----|----------|
 | AI Quorum | `ixncscosicyjzlopbfiz` | Sessions, LLM orchestration, models |
 | Owner Portal | `hympgocuivzxzxllgmcy` | Tasks, decisions, companies, handoff |
+| Om Cortex | `sgcfettixymowtokytwk` | Sessions, memory, knowledge (pgvector) |
 
 **CLI notes:**
 - `supabase db push` to push migrations (no `--sql` flag)
@@ -44,12 +45,14 @@ supabase db push
 | AI Quorum Frontend | https://frontend-eosin-one-68.vercel.app | Vercel |
 | AI Quorum Backend | Render service `srv-d5snc28gjchc73b2se10` | Render |
 | Owner Portal | https://om-apex-site.vercel.app | Vercel |
+| Om Cortex Backend | https://om-cortex.onrender.com | Render (`srv-d67jupngi27c739uj4ag`) |
 
 ## Local Development Ports
 
 | Project | Port | Folder |
 |---------|------|--------|
 | AI Quorum | 3000 | `products/ai-quorum/` |
+| Om Cortex | 9000 | `products/om-cortex/` |
 | Owner Portal | 3001 | `websites/apex/` |
 | AI Solutions | 3002 | `websites/ai-solutions/` |
 | Supply Chain | 3003 | `websites/supply-chain/` |
@@ -65,6 +68,11 @@ stopquorum    # alias — kills all uvicorn, next-server, port processes
 Scripts: `~/om-apex/products/ai-quorum/scripts/startquorum.sh` / `stopquorum.sh`
 Logs: `/tmp/quorum-backend.log`, `/tmp/quorum-frontend.log`
 
+**Om Cortex:**
+```bash
+cd ~/om-apex/products/om-cortex/backend && pnpm dev   # Starts on port 9000
+```
+
 **Other projects:** `cd <project-folder> && npm run dev`
 
 ## Centralized Config
@@ -78,6 +86,7 @@ Logs: `/tmp/quorum-backend.log`, `/tmp/quorum-frontend.log`
 | `.env.openrouter` | OpenRouter API key |
 | `.env.providers` | OpenAI, Anthropic, Google, xAI, Perplexity API keys |
 | `.env.factcheck` | Google Fact Check, Tavily API keys |
+| `.env.cortex` | Om Cortex Supabase + gateway credentials |
 | `.env.cloudflare` | Cloudflare API token |
 
 **Sync scripts:**
@@ -89,6 +98,7 @@ Logs: `/tmp/quorum-backend.log`, `/tmp/quorum-frontend.log`
 ```
 om-apex/
 ├── products/ai-quorum/          # AI Quorum (Next.js + FastAPI)
+├── products/om-cortex/          # Om Cortex (TypeScript + Hono, port 9000)
 ├── websites/
 │   ├── apex/                    # Owner Portal (Next.js, port 3001)
 │   ├── ai-solutions/            # omaisolutions.com
@@ -112,6 +122,7 @@ om-apex/
 |------|---------|
 | `tool-mcp-server` | MCP Server |
 | `ai-quorum` | AI Quorum product |
+| `product-om-cortex` | Om Cortex product |
 | `om-apex-site` | Owner Portal website |
 
 ## Common Render Commands

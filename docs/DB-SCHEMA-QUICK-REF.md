@@ -1,6 +1,6 @@
 # Database Schema Quick Reference
 
-> Last updated: 2026-02-16
+> Last updated: 2026-02-21
 
 ## Owner Portal (hympgocuivzxzxllgmcy)
 
