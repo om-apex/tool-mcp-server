@@ -1,6 +1,6 @@
 # Database Schema Quick Reference
 
-> Last updated: 2026-02-21
+> Last updated: 2026-02-22
 
 ## Owner Portal (hympgocuivzxzxllgmcy)
 
@@ -106,6 +106,27 @@ Archived previous handoffs for audit/review.
 | interface | TEXT | Which interface |
 | session_date | DATE | Date of the archived session |
 | created_at | TIMESTAMPTZ | When archived |
+
+### leads
+Contact form submissions from all websites. Dual-write target (Supabase + HubSpot).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| email | TEXT NOT NULL | Submitter email |
+| firstname | TEXT | First name |
+| lastname | TEXT | Last name |
+| company | TEXT | Company name |
+| phone | TEXT | Phone number |
+| brand | TEXT NOT NULL | `om_apex_holdings`, `om_ai_solutions`, `om_supply_chain` |
+| form_type | TEXT NOT NULL | `general`, `demo_request`, `consultation_request` (default: general) |
+| message | TEXT | Form message |
+| metadata | JSONB | Additional data (default: {}) |
+| hubspot_contact_id | TEXT | HubSpot contact ID after sync |
+| hubspot_synced | BOOLEAN | Whether HubSpot sync succeeded (default: false) |
+| created_at | TIMESTAMPTZ | Auto |
+
+**RLS:** Service role full access only. Indexes on `brand` and `email`.
 
 ---
 
