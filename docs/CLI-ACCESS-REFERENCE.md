@@ -52,7 +52,8 @@ supabase db push
 | Project | Port | Folder |
 |---------|------|--------|
 | AI Quorum | 3000 | `products/ai-quorum/` |
-| Om Cortex | 9000 | `products/om-cortex/` |
+| Om Cortex Backend | 9000 | `products/om-cortex/backend/` |
+| Om Cortex Mission Control | 3005 | `products/om-cortex/frontend/` |
 | Owner Portal | 3001 | `websites/apex/` |
 | AI Solutions | 3002 | `websites/ai-solutions/` |
 | Supply Chain | 3003 | `websites/supply-chain/` |
@@ -70,7 +71,8 @@ Logs: `/tmp/quorum-backend.log`, `/tmp/quorum-frontend.log`
 
 **Om Cortex:**
 ```bash
-cd ~/om-apex/products/om-cortex/backend && pnpm dev   # Starts on port 9000
+cd ~/om-apex/products/om-cortex/backend && pnpm dev    # Backend on port 9000
+cd ~/om-apex/products/om-cortex/frontend && npm run dev # Mission Control on port 3005
 ```
 
 **Other projects:** `cd <project-folder> && npm run dev`
