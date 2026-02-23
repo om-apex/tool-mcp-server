@@ -15,13 +15,14 @@ from . import ToolModule
 from ..supabase_client import (
     is_supabase_available,
     get_tasks as sb_get_tasks,
+    get_task_queue as sb_get_task_queue,
     add_task as sb_add_task,
     update_task as sb_update_task,
     get_next_task_id,
 )
 
 
-READING = ["get_pending_tasks"]
+READING = ["get_pending_tasks", "get_task_queue"]
 WRITING = ["add_task", "complete_task", "update_task_status", "update_task"]
 
 
@@ -48,6 +49,21 @@ def register() -> ToolModule:
                     "status": {"type": "string", "description": "Filter by status: pending, in_progress, completed (optional)"},
                     "owner": {"type": "string", "description": "Filter by owner name (e.g., Nishad, Sumedha, Both, Claude, Scroggin, etc.)"},
                     "task_type": {"type": "string", "description": "Filter by task type: issue, dev, manual (optional)"},
+                },
+                "required": [],
+            },
+        ),
+        Tool(
+            name="get_task_queue",
+            description="Get a compact task listing: id, truncated description (80 chars), priority, status, owner, company. Sorted by priority (High→Medium→Low) then age (oldest first). Default limit 10.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Max tasks to return (default 10)"},
+                    "owner": {"type": "string", "description": "Filter by owner name (optional)"},
+                    "priority": {"type": "string", "description": "Filter by priority: High, Medium, Low (optional)"},
+                    "status": {"type": "string", "description": "Filter by status: pending, in_progress (optional, defaults to both)"},
+                    "company": {"type": "string", "description": "Filter by company name (optional)"},
                 },
                 "required": [],
             },
@@ -124,6 +140,27 @@ def register() -> ToolModule:
                 task_type=arguments.get("task_type"),
             )
             return [TextContent(type="text", text=json.dumps(tasks, indent=2))]
+
+        elif name == "get_task_queue":
+            _require_supabase()
+            tasks = sb_get_task_queue(
+                limit=arguments.get("limit", 10),
+                owner=arguments.get("owner"),
+                priority=arguments.get("priority"),
+                status=arguments.get("status"),
+                company=arguments.get("company"),
+            )
+            if not tasks:
+                return [TextContent(type="text", text="Task Queue: No tasks found.")]
+            lines = [f"Task Queue ({len(tasks)} tasks):"]
+            for t in tasks:
+                owner_str = f" @{t['owner']}" if t.get("owner") else ""
+                company_str = f" [{t['company']}]" if t.get("company") else ""
+                lines.append(
+                    f"{t['id']} [{t.get('priority', '?')}] ({t.get('status', '?')}) "
+                    f"{t.get('description', '')}{owner_str}{company_str}"
+                )
+            return [TextContent(type="text", text="\n".join(lines))]
 
         elif name == "add_task":
             _require_supabase()

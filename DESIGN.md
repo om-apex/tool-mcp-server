@@ -2,7 +2,7 @@
 
 ## Overview
 
-Model Context Protocol (MCP) server providing persistent memory and tools across all Claude interfaces (Chat, Cowork, Claude Code). 41 tools across 7 modules for managing company context, tasks, decisions, documents, calendar, session handoffs, and AI Quorum diagnostics.
+Model Context Protocol (MCP) server providing persistent memory and tools across all Claude interfaces (Chat, Cowork, Claude Code). 42 tools across 7 modules for managing company context, tasks, decisions, documents, calendar, session handoffs, and AI Quorum diagnostics.
 
 ## Tech Stack
 
@@ -68,7 +68,7 @@ mcp-server/
 | Module | Tools | Key Functions |
 |--------|-------|--------------|
 | **Context** (7) | get_full_context, get_company_context, get_technology_decisions, get_domain_inventory, get_cli_status, get_claude_instructions, get_decisions_history | Company info, tech stack, CLI status |
-| **Tasks** (5) | get_pending_tasks, add_task, complete_task, update_task_status, update_task | Task CRUD via Supabase |
+| **Tasks** (6) | get_pending_tasks, get_task_queue, add_task, complete_task, update_task_status, update_task | Task CRUD via Supabase |
 | **Progress** (3) | get_daily_progress, add_daily_progress, search_daily_progress | Session logging to files |
 | **Documents** (11) | generate_branded_html, generate_company_document, view/list/create/update/delete templates, get_brand_assets, list_company_configs, sync_templates | Document generation + branding |
 | **Calendar** (3) | list_calendar_events, create_calendar_event, delete_calendar_event | Google Calendar API |
@@ -106,8 +106,8 @@ Used for: quorum diagnostics (sessions, turns, model calls, config)
 
 | Level | Access | Mechanism |
 |-------|--------|-----------|
-| Full | All 41 tools | `X-API-Key` header with valid key |
-| Demo | 12 read-only tools | `OM_APEX_DEMO_MODE=true`, no key |
+| Full | All 42 tools | `X-API-Key` header with valid key |
+| Demo | 13 read-only tools | `OM_APEX_DEMO_MODE=true`, no key |
 | None | 401 error | No key, demo disabled |
 
 ## Tool Registration

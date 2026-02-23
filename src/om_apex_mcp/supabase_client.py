@@ -298,6 +298,75 @@ def get_next_task_id() -> str:
         return "TASK-001"
 
 
+def get_task_queue(
+    limit: int = 10,
+    owner: Optional[str] = None,
+    priority: Optional[str] = None,
+    status: Optional[str] = None,
+    company: Optional[str] = None,
+) -> list[dict]:
+    """Get a compact task queue sorted by priority then age.
+
+    Returns only essential fields (id, description truncated to 80 chars,
+    priority, status, owner, company) for minimal token usage.
+
+    Args:
+        limit: Max tasks to return (default 10).
+        owner: Filter by owner name (optional).
+        priority: Filter by priority: High, Medium, Low (optional).
+        status: Filter by status (optional, defaults to pending + in_progress).
+        company: Filter by company name (optional).
+
+    Returns:
+        List of compact task dicts sorted by priority (High→Medium→Low) then age.
+    """
+    try:
+        client = get_supabase_client()
+        if not client:
+            logger.debug("get_task_queue: Supabase not available")
+            return []
+
+        query = client.table("tasks").select(
+            "id, description, priority, status, owner, company, created_at"
+        )
+
+        # Status filter: default to pending + in_progress
+        if status:
+            query = query.ilike("status", status)
+        else:
+            query = query.or_("status.eq.pending,status.eq.in_progress")
+
+        if owner:
+            query = query.ilike("owner", owner)
+        if priority:
+            query = query.ilike("priority", priority)
+        if company:
+            query = query.ilike("company", company)
+
+        # Fetch more than needed, sort in Python by priority then age
+        response = query.order("created_at", desc=False).limit(limit * 3).execute()
+        tasks = response.data or []
+
+        # Sort by priority (High=0, Medium=1, Low=2) then age (oldest first)
+        priority_order = {"High": 0, "Medium": 1, "Low": 2}
+        tasks.sort(key=lambda t: (
+            priority_order.get(t.get("priority", "Low"), 3),
+            t.get("created_at", ""),
+        ))
+
+        # Truncate descriptions and take top N
+        for t in tasks:
+            desc = t.get("description", "")
+            if len(desc) > 80:
+                t["description"] = desc[:77] + "..."
+
+        return tasks[:limit]
+    except Exception as e:
+        logger.error(f"Error fetching task queue: {e}")
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
+        return []
+
+
 # =============================================================================
 # Decision Operations
 # =============================================================================

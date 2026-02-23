@@ -92,12 +92,13 @@ class TestModuleRegistration:
         for m in [context_mod, task_mod, progress_mod, documents_mod]:
             all_tools.extend(t.name for t in m.tools)
 
-        # 7 context + 5 tasks + 3 progress + 2 documents = 17
-        assert len(all_tools) == 17
+        # 7 context + 6 tasks + 3 progress + 11 documents = 27
+        assert len(all_tools) == 27
 
         # Spot-check key tools exist
         assert "get_full_context" in all_tools
         assert "add_task" in all_tools
+        assert "get_task_queue" in all_tools
         assert "add_daily_progress" in all_tools
         assert "generate_branded_html" in all_tools
         assert "list_company_configs" in all_tools

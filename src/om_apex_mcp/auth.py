@@ -25,6 +25,7 @@ DEMO_MODE_TOOLS = [
     "get_decisions_history",
     "get_domain_inventory",
     "get_pending_tasks",
+    "get_task_queue",
     "get_daily_progress",
     "search_daily_progress",
     "list_company_configs",
