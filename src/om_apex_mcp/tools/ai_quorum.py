@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from mcp.types import Tool, TextContent
 
 from . import ToolModule
-from ..quorum_supabase import is_quorum_available, get_quorum_client
+from ..quorum_supabase import is_quorum_available, get_quorum_client, reset_quorum_client
 
 
 READING = [
@@ -30,13 +30,25 @@ WRITING = [
 
 
 def _require_quorum() -> None:
-    """Ensure AI Quorum Supabase is available. Raises RuntimeError if not."""
+    """Ensure AI Quorum Supabase is available. Resets cached client on 401 errors."""
     if not is_quorum_available():
         raise RuntimeError(
             "AI Quorum Supabase is not available. "
             "Check that QUORUM_SUPABASE_URL and QUORUM_SUPABASE_SERVICE_KEY are set, "
             "or that ~/om-apex/config/.env.supabase exists with SUPABASE_URL and SUPABASE_SERVICE_KEY."
         )
+    # Verify the cached client still works (catches stale keys in long-running processes)
+    client = get_quorum_client()
+    try:
+        client.table("orch_sessions").select("id").limit(1).execute()
+    except Exception as e:
+        if "401" in str(e) or "Invalid API key" in str(e):
+            reset_quorum_client()
+            # Retry with fresh client
+            if not is_quorum_available():
+                raise RuntimeError("AI Quorum Supabase: key reset failed. Check .env.supabase.")
+        else:
+            raise
 
 
 def _json_response(data) -> list[TextContent]:

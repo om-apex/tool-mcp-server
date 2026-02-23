@@ -148,6 +148,16 @@ def get_quorum_client():
         return None
 
 
+def reset_quorum_client() -> None:
+    """Clear the cached Quorum Supabase client so it will be recreated on next call.
+
+    Use this when encountering 401 errors — the cached client may have a stale key.
+    """
+    global _quorum_client
+    _quorum_client = None
+    logger.info("Quorum Supabase client cache cleared")
+
+
 def is_quorum_available() -> bool:
     """Check if AI Quorum Supabase is configured and available."""
     return get_quorum_client() is not None
