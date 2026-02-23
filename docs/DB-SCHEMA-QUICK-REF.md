@@ -1,6 +1,6 @@
 # Database Schema Quick Reference
 
-> Last updated: 2026-02-22
+> Last updated: 2026-02-23
 
 ## Owner Portal (hympgocuivzxzxllgmcy)
 
@@ -230,6 +230,89 @@ Per-user settings.
 | report_format | TEXT | Preferred report format |
 | created_at | TIMESTAMPTZ | Auto |
 | updated_at | TIMESTAMPTZ | Auto |
+
+### marketing_channels
+Marketing channel master table for coupon attribution.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| name | TEXT UNIQUE | Display name (e.g., "LinkedIn") |
+| slug | TEXT UNIQUE | URL-safe slug (e.g., "linkedin") |
+| description | TEXT | Channel description |
+| is_active | BOOLEAN | Default true |
+| created_at | TIMESTAMPTZ | Auto |
+
+Seeded with: LinkedIn, X/Twitter, Facebook, AI Blog, SCM Blog, Refer a Friend.
+
+### coupons
+Campaign, referral, and weekly coupons with full lifecycle management.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| code | TEXT UNIQUE | Coupon code (uppercased) |
+| channel_id | UUID FK | References marketing_channels(id) |
+| source | TEXT | `campaign`, `referral`, `weekly` |
+| source_campaign | TEXT | Campaign identifier (optional) |
+| credits_amount | INT | Credits awarded (default 500) |
+| status | TEXT | `draft`, `published`, `expired`, `exhausted`, `deactivated` |
+| valid_from | TIMESTAMPTZ | Default now() |
+| valid_until | TIMESTAMPTZ | Expiry date (nullable) |
+| max_uses | INT | Usage limit (nullable = unlimited) |
+| current_uses | INT | Current redemption count (default 0) |
+| referrer_user_id | UUID FK | References auth.users (for referral coupons) |
+| referrer_bonus_credits | INT | Bonus for referrer (default 0) |
+| notes | TEXT | Admin notes |
+| created_at | TIMESTAMPTZ | Auto |
+| updated_at | TIMESTAMPTZ | Auto |
+| published_at | TIMESTAMPTZ | When admin published |
+| published_by | TEXT | Who published |
+
+**RLS:** Users can read published coupons. Service role has full access.
+**Seed:** WELCOME2026 (published, ai-blog channel, 500 credits, no expiry).
+
+### coupon_redemptions
+Per-user coupon usage history for analytics.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| coupon_id | UUID FK | References coupons(id) |
+| user_id | UUID FK | References auth.users(id) |
+| credits_awarded | INT | Credits given |
+| redeemed_at | TIMESTAMPTZ | Default now() |
+
+**Constraint:** UNIQUE(coupon_id, user_id) — one redemption per user per coupon.
+
+### referral_conversions
+Tracks referral bonus conversions (deferred — for Stripe integration).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| referral_coupon_id | UUID FK | References coupons(id) |
+| referred_user_id | UUID FK | References auth.users(id) |
+| referrer_user_id | UUID FK | References auth.users(id) |
+| conversion_type | TEXT | Default `signup` |
+| bonus_credits_awarded | INT | Default 0 |
+| converted_at | TIMESTAMPTZ | Default now() |
+
+### v_coupon_attribution (View)
+Joins coupons + marketing_channels + aggregated redemption counts. Used by admin coupon management UI.
+
+Columns: All coupons columns + `channel_name`, `channel_slug`, `redemption_count`, `total_credits_awarded`.
+
+### RPC Functions (Coupon System)
+
+**redeem_coupon(p_code TEXT, p_user_id UUID)**
+Validates coupon status (published), checks expiry/max_uses/already-redeemed, updates `profiles.credits_remaining`, inserts redemption record, increments `current_uses`. Returns JSON `{success, credits_awarded, new_balance}` or `{success: false, error: "ERROR_CODE"}`.
+
+**generate_referral_coupon(p_user_id UUID)**
+Creates or retrieves a referral coupon for the user. Source='referral', channel='refer-a-friend', auto-published (bypasses admin). Code pattern: `REFER-{8chars}`. Returns JSON with coupon details.
+
+**generate_weekly_coupons()**
+For each active marketing channel, creates a draft coupon with source='weekly', valid_until = 7 days. Code pattern: `WEEKLY-{SLUG}-{YYYYWW}`. Returns array of created coupon objects.
 
 ### Additional Config Tables (orch_*)
 The orchestration engine has several config tables for stages, model slots, prompt templates, and taxonomy. These are seeded via migrations and rarely queried directly. See migration files in `products/ai-quorum/supabase/migrations/` for full schema.
