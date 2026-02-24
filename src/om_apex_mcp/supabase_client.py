@@ -753,11 +753,12 @@ def save_session_handoff(content: str, created_by: str, interface: str, checkpoi
         raise RuntimeError(f"Failed to save handoff: {e}") from e
 
 
-def get_handoff_history(limit: int = 10) -> list[dict]:
+def get_handoff_history(limit: int = 10, created_by: str | None = None) -> list[dict]:
     """Get previous session handoffs from history.
 
     Args:
         limit: Max number of records to return.
+        created_by: Optional filter — only return entries by this instance/person.
 
     Returns:
         List of historical handoff records, newest first.
@@ -767,13 +768,10 @@ def get_handoff_history(limit: int = 10) -> list[dict]:
         if not client:
             return []
 
-        response = (
-            client.table("session_handoff_history")
-            .select("*")
-            .order("created_at", desc=True)
-            .limit(limit)
-            .execute()
-        )
+        query = client.table("session_handoff_history").select("*")
+        if created_by:
+            query = query.eq("created_by", created_by)
+        response = query.order("created_at", desc=True).limit(limit).execute()
         return response.data or []
     except Exception as e:
         logger.error(f"Error fetching handoff history: {e}")

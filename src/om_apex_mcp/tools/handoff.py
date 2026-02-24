@@ -20,7 +20,7 @@ from ..supabase_client import (
 
 logger = logging.getLogger("om-apex-mcp")
 
-READING = ["get_session_handoff"]
+READING = ["get_session_handoff", "get_handoff_history"]
 WRITING = ["save_session_handoff"]
 
 
@@ -34,6 +34,29 @@ def register() -> ToolModule:
                 "key constants, and next steps. Call this FIRST at every session start."
             ),
             inputSchema={"type": "object", "properties": {}, "required": []},
+        ),
+        Tool(
+            name="get_handoff_history",
+            description=(
+                "Get previous session handoffs from history. "
+                "Optionally filter by created_by to retrieve entries from a specific "
+                "instance or person (e.g., 'Nishad-2'). "
+                "Useful for instance-aware context when multiple Claude instances are running."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "created_by": {
+                        "type": "string",
+                        "description": "Filter to only return handoffs by this instance/person (e.g., 'Nishad-2')",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max number of records to return (default: 5)",
+                    },
+                },
+                "required": [],
+            },
         ),
         Tool(
             name="save_session_handoff",
@@ -106,6 +129,43 @@ def register() -> ToolModule:
                 logger.error(f"Error in get_session_handoff: {e}")
                 logger.error(f"Traceback:\n{traceback.format_exc()}")
                 return [TextContent(type="text", text=f"Error getting handoff: {e}")]
+
+        elif name == "get_handoff_history":
+            try:
+                if not is_supabase_available():
+                    return [TextContent(
+                        type="text",
+                        text="Handoff history unavailable (Supabase offline).",
+                    )]
+
+                limit = arguments.get("limit", 5)
+                created_by = arguments.get("created_by")
+                records = sb_get_history(limit=limit, created_by=created_by)
+
+                if not records:
+                    filter_note = f" for '{created_by}'" if created_by else ""
+                    return [TextContent(
+                        type="text",
+                        text=f"No handoff history found{filter_note}.",
+                    )]
+
+                lines = []
+                filter_note = f" (filtered by: {created_by})" if created_by else ""
+                lines.append(f"Handoff history — {len(records)} record(s){filter_note}:\n")
+                for i, record in enumerate(records, 1):
+                    meta = (
+                        f"[{i}] Created: {record.get('created_at', 'unknown')} | "
+                        f"By: {record.get('created_by', 'unknown')} | "
+                        f"Via: {record.get('interface', 'unknown')}"
+                    )
+                    content = record.get("content", "").strip()
+                    lines.append(f"{meta}\n{content}\n")
+
+                return [TextContent(type="text", text="\n".join(lines))]
+            except Exception as e:
+                logger.error(f"Error in get_handoff_history: {e}")
+                logger.error(f"Traceback:\n{traceback.format_exc()}")
+                return [TextContent(type="text", text=f"Error fetching handoff history: {e}")]
 
         elif name == "save_session_handoff":
             try:
