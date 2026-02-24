@@ -42,7 +42,7 @@ try:
     from .storage import StorageBackend, LocalStorage
     from .tools import ToolModule
     from .tools.helpers import init_storage
-    from .tools import context, tasks, progress, documents, calendar, handoff, ai_quorum
+    from .tools import context, tasks, progress, documents, calendar, handoff, ai_quorum, incidents
 except ImportError as e:
     logger.critical(f"Failed to import local modules: {e}")
     logger.critical(f"Traceback:\n{traceback.format_exc()}")
@@ -147,6 +147,16 @@ def create_server(backend: Optional[StorageBackend] = None) -> Server:
         logger.error(f"Traceback:\n{traceback.format_exc()}")
         _quorum_mod = None
 
+    # Incidents module (Om Cortex prodsupport_incidents)
+    try:
+        _incidents_mod = incidents.register()
+        modules.append(_incidents_mod)
+        logger.info(f"Incidents module loaded ({len(_incidents_mod.tools)} tools)")
+    except Exception as e:
+        logger.error(f"Failed to load incidents module: {e}")
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
+        _incidents_mod = None
+
     # Phase 4: Build tool lists and register context module
     try:
         _all_reading = context.READING.copy()
@@ -170,6 +180,9 @@ def create_server(backend: Optional[StorageBackend] = None) -> Server:
         if _quorum_mod:
             _all_reading += _quorum_mod.reading_tools
             _all_writing += _quorum_mod.writing_tools
+        if _incidents_mod:
+            _all_reading += _incidents_mod.reading_tools
+            _all_writing += _incidents_mod.writing_tools
 
         _context_mod = context.register(_all_reading, _all_writing)
         modules.insert(0, _context_mod)  # Context module first
