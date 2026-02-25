@@ -2,7 +2,7 @@
 
 ## Overview
 
-Model Context Protocol (MCP) server providing persistent memory and tools across all Claude interfaces (Chat, Cowork, Claude Code). 42 tools across 7 modules for managing company context, tasks, decisions, documents, calendar, session handoffs, and AI Quorum diagnostics.
+Model Context Protocol (MCP) server providing persistent memory and tools across all Claude interfaces (Chat, Cowork, Claude Code). 54 tools across 9 modules for managing company context, tasks, decisions, documents, calendar, session handoffs, AI Quorum diagnostics, production incidents, and DNS security.
 
 ## Tech Stack
 
@@ -29,16 +29,19 @@ mcp-server/
 │   ├── storage.py             # Storage backend abstraction
 │   ├── supabase_client.py     # Supabase client (tasks, decisions, handoff)
 │   ├── quorum_supabase.py     # AI Quorum DB integration
-│   └── tools/                 # 7 tool modules
+│   ├── cloudflare_client.py   # Cloudflare DNS API client (async, httpx)
+│   └── tools/                 # 9 tool modules
 │       ├── __init__.py        # ToolModule dataclass
 │       ├── helpers.py         # Shared utilities, storage init
 │       ├── context.py         # Company context (7 tools)
-│       ├── tasks.py           # Task CRUD (5 tools)
+│       ├── tasks.py           # Task CRUD (6 tools)
 │       ├── progress.py        # Daily progress (3 tools)
 │       ├── documents.py       # Document generation (11 tools)
 │       ├── calendar.py        # Google Calendar (3 tools)
 │       ├── handoff.py         # Session handoff (2 tools)
-│       └── ai_quorum.py       # Quorum diagnostics (10 tools)
+│       ├── ai_quorum.py       # Quorum diagnostics (10 tools)
+│       ├── incidents.py       # Production incidents (2 tools)
+│       └── dns_sentinel.py    # DNS audit + heal (10 tools)
 ├── data/
 │   ├── context/               # JSON fallback files
 │   └── demo/                  # Demo data (bundled in Docker)
@@ -63,7 +66,7 @@ mcp-server/
 - `GET /health` — Health check (public, no auth)
 - `POST /mcp/*` — Streamable HTTP MCP endpoint (requires auth)
 
-## Tool Modules (41 tools)
+## Tool Modules (54 tools)
 
 | Module | Tools | Key Functions |
 |--------|-------|--------------|
@@ -73,7 +76,9 @@ mcp-server/
 | **Documents** (11) | generate_branded_html, generate_company_document, view/list/create/update/delete templates, get_brand_assets, list_company_configs, sync_templates | Document generation + branding |
 | **Calendar** (3) | list_calendar_events, create_calendar_event, delete_calendar_event | Google Calendar API |
 | **Handoff** (2) | get_session_handoff, save_session_handoff | Cross-device session state |
-| **AI Quorum** (10) | quorum_status, sessions, turns, trace, logs, performance, costs, user, stage config (get/update) | Diagnostics for AI Quorum product |
+| **AI Quorum** (10) | get_quorum_status, list_quorum_sessions, get_quorum_turn_detail, get_quorum_turn_trace, get_quorum_logs, get_quorum_model_performance, get_quorum_cost_summary, get_quorum_stage_config, update_quorum_stage_config, get_quorum_user_detail | Diagnostics for AI Quorum product |
+| **Incidents** (2) | incident_create, incident_list | Production incident tracking (Om Cortex Supabase) |
+| **DNS Sentinel** (10) | dns_snapshot, dns_audit, dns_heal, dns_approve, dns_reject, dns_view_config, dns_view_approvals, dns_view_changes, dns_view_snapshot, dns_update_config | DNS audit, auto-heal, and change management for all 21 Cloudflare domains |
 
 ## Storage Backends
 
@@ -91,10 +96,13 @@ mcp-server/
 ## Supabase Integration
 
 ### Owner Portal Project (`hympgocuivzxzxllgmcy`)
-Used for: tasks, decisions, session handoff, document templates, company configs
+Used for: tasks, decisions, session handoff, document templates, company configs, DNS Sentinel (dns_services, dns_domain_config, dns_policies, dns_audit_log, dns_change_log, dns_approval_queue, dns_snapshots)
 
 ### AI Quorum Project (`ixncscosicyjzlopbfiz`)
 Used for: quorum diagnostics (sessions, turns, model calls, config)
+
+### Om Cortex Project (`sgcfettixymowtokytwk`)
+Used for: production incident tracking (prodsupport_incidents)
 
 ### Resilience Pattern
 - Lazy singleton client initialization
@@ -106,7 +114,7 @@ Used for: quorum diagnostics (sessions, turns, model calls, config)
 
 | Level | Access | Mechanism |
 |-------|--------|-----------|
-| Full | All 42 tools | `X-API-Key` header with valid key |
+| Full | All 54 tools | `X-API-Key` header with valid key |
 | Demo | 13 read-only tools | `OM_APEX_DEMO_MODE=true`, no key |
 | None | 401 error | No key, demo disabled |
 
@@ -133,7 +141,50 @@ Each module loads independently — failure of one module doesn't crash the serv
 | `QUORUM_SUPABASE_SERVICE_KEY` | AI Quorum admin key |
 | `GOOGLE_SERVICE_ACCOUNT_FILE` | Drive API credentials |
 | `GOOGLE_SHARED_DRIVE_ID` | Shared drive ID |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token (DNS Sentinel) |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID (DNS Sentinel) |
+| `SENDGRID_API_KEY` | SendGrid API key for DNS alert emails (optional — Phase 3) |
 | `PORT` | HTTP server port (default: 8000) |
+
+**Config file locations (local):** All keys stored in `~/om-apex/config/`. Cloudflare keys in `.env.cloudflare`.
+
+## DNS Sentinel
+
+Automated DNS audit and security enforcement for all 21 Om Apex Cloudflare domains.
+
+### Architecture
+- **Cloudflare client** (`cloudflare_client.py`): Async httpx client. Singleton config from `~/om-apex/config/.env.cloudflare`. CRUD on zones + DNS records.
+- **MCP tools** (`tools/dns_sentinel.py`): 10 tools. Reads live DNS from Cloudflare, compares against source of truth in Supabase, evaluates 15 policies, auto-heals safe records, queues dangerous changes.
+- **Storage**: Owner Portal Supabase (`hympgocuivzxzxllgmcy`) — 7 tables.
+
+### Email Domains (Google Workspace)
+omapex.com, omaisolutions.com, omluxeproperties.com, omsupplychain.com — MX + SPF `~all` + DKIM + DMARC `p=quarantine`.
+
+### Non-Email Domains (17)
+All other domains — SPF `-all` + DMARC `p=reject`. No MX.
+
+### Safety Classification
+- **Auto-heal** (no approval): Add missing TXT (DMARC, SPF), CAA records
+- **Requires approval**: Any A/MX/CNAME change, any delete, SPF edits on email domains
+- **Audit-only** (no action): theomgroup.ai (Tier 5, expiring)
+
+### Record Safety: Approval Queue
+Dangerous changes are queued in `dns_approval_queue`. Use `dns_view_approvals` to review, `dns_approve` / `dns_reject` to act. Queue auto-expires after 7 days.
+
+### Current State (2026-02-25)
+- 20/21 domains passing (theomgroup.ai Tier 5 — intentional)
+- Approval queue: 0 pending
+- Phase 3 pending: SendGrid email alerts + Om Cortex daily cron + `/dns-audit` skill
+
+### Running an Audit
+```bash
+# Via Claude Code (MCP tool)
+dns_audit()                          # Full audit, all 21 domains
+dns_audit(domain="omapex.com")       # Single domain
+dns_audit(tier=1)                    # Tier 1 only
+dns_heal(dry_run=True)               # Preview auto-fixes
+dns_heal(dry_run=False)              # Apply auto-fixes
+```
 
 ## Deployment
 
