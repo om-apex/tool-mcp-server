@@ -1,5 +1,105 @@
 # Setting Up Om Apex MCP Server on Sumedha's Laptop (Windows 11)
 
+## Step 0: Install WSL2 + Zsh (Recommended Shell)
+
+Claude Code and the instance auto-detection system run in **WSL2 with zsh**. This gives a native Linux environment on Windows with full shell feature parity with Nishad's Mac.
+
+### Install WSL2
+
+Open PowerShell as Administrator:
+```powershell
+wsl --install -d Ubuntu
+# Restart when prompted
+```
+
+After restart, Ubuntu will finish setup — create a Unix username and password when asked.
+
+### Install zsh and set as default
+
+Inside the WSL2 terminal:
+```bash
+sudo apt update && sudo apt install -y zsh
+chsh -s $(which zsh)
+# Close and reopen terminal — zsh will run on next launch
+```
+
+### Install Node.js and Claude Code CLI
+
+```bash
+# Install Node.js via nvm (recommended)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.zshrc
+nvm install --lts
+
+# Install Claude Code
+npm install -g @anthropic-ai/claude-code
+```
+
+### Configure ~/.zshrc
+
+Add the following to `~/.zshrc` in WSL2. **Key difference from Nishad's Mac: `TERMINAL_NAME="Sumedha"`.**
+
+```zsh
+# Minimal prompt
+export PS1="%1d %% "
+
+# Identity for Claude Code multi-instance coordination
+# Sumedha's machine uses "Sumedha" — auto-instances become Sumedha-1, Sumedha-2
+export TERMINAL_NAME="Sumedha"
+
+# Claude Code instance selector — auto-detects instance number via lockfiles
+claude() {
+  if [[ "$1" == "/login" || "$1" == "auth" || "$1" == "--version" || "$1" == "-v" ]]; then
+    command claude "$@"
+    return
+  fi
+
+  local base="${TERMINAL_NAME:-Sumedha}"
+
+  for lockfile in /tmp/claude-instance-${base}-*.lock(N); do
+    local pid=$(cat "$lockfile" 2>/dev/null)
+    if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then
+      rm -f "$lockfile"
+    fi
+  done
+
+  local instance_num=1
+  while [[ -f "/tmp/claude-instance-${base}-${instance_num}.lock" ]]; do
+    ((instance_num++))
+  done
+
+  local instance="${base}-${instance_num}"
+  local lockfile="/tmp/claude-instance-${base}-${instance_num}.lock"
+
+  echo $$ > "$lockfile"
+  echo "Starting $instance"
+
+  CLAUDE_INSTANCE="$instance" command claude "$@"
+  local status=$?
+
+  rm -f "$lockfile"
+  return $status
+}
+
+# Claude Code settings
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+export ENABLE_TOOL_SEARCH=auto:5
+```
+
+After saving, reload: `source ~/.zshrc`
+
+### Working directory
+
+Keep the om-apex repo cloned inside the WSL2 Linux filesystem (not under `/mnt/c/`) for best performance:
+```bash
+mkdir -p ~/om-apex
+cd ~/om-apex
+git clone https://github.com/om-apex/<repo>.git
+```
+
+---
+
+
 This guide helps set up the Om Apex MCP server on Sumedha's Windows 11 laptop to share context with Nishad's MacBook.
 
 ## Prerequisites
