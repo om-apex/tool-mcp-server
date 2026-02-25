@@ -172,7 +172,7 @@ INSERT INTO dns_domain_config (domain, tier, tier_label, services, redirect_targ
 ('omcortex.ai',           1, 'active',           ARRAY['email-security-baseline'],                            NULL, 'Om Cortex product domain. No email.'),
 -- Tier 2: Near-term
 ('omwms.com',             2, 'near_term',        ARRAY['email-security-baseline'],                            NULL, 'Om WMS primary domain. No email yet.'),
-('omwms.ai',              2, 'near_term',        ARRAY['email-security-baseline', 'cloudflare-redirect'],     'omwms.com', 'Redirects to omwms.com'),
+-- omwms.ai not owned (as of 2026-02-25). Available for $70/2yr if needed. Considering wms.omsupplychain.ai subdomain strategy instead.
 ('omvoice.ai',            2, 'near_term',        ARRAY['email-security-baseline'],                            NULL, 'Om Voice product domain. No email.'),
 ('omvoiceai.com',         2, 'near_term',        ARRAY['email-security-baseline', 'cloudflare-redirect'],     'omvoice.ai', 'Redirects to omvoice.ai'),
 ('omlms.com',             2, 'near_term',        ARRAY['email-security-baseline'],                            NULL, 'Om LMS domain. No email.'),

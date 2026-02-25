@@ -1,15 +1,16 @@
 {
-  "version": "1.1",
-  "last_updated": "2026-02-21",
+  "version": "1.2",
+  "last_updated": "2026-02-25",
   "source": "Om_Apex_Domain_Inventory.docx + manual updates",
 
   "summary": {
-    "total_domains": 22,
+    "total_domains": 21,
     "primary_registrar": "Cloudflare",
-    "cloudflare_count": 22,
+    "cloudflare_count": 21,
     "transferring": 0,
     "discontinuing": 1,
-    "estimated_annual_cost": "$500-600"
+    "estimated_annual_cost": "$480-580",
+    "notes": "omwms.ai not owned — considering wms.omsupplychain.ai subdomain strategy instead. omwms.ai/$70/2yr, omlms.ai, omtms.ai are available if needed."
   },
 
   "naming_convention": {
@@ -49,8 +50,10 @@
     },
     "tier2_near_term": {
       "description": "Will be activated as products launch in 2026",
-      "count": 6,
-      "domains": ["omwms.com", "omwms.ai", "omvoice.ai", "omvoiceai.com", "omlms.com", "omtms.com"]
+      "count": 5,
+      "domains": ["omwms.com", "omvoice.ai", "omvoiceai.com", "omlms.com", "omtms.com"],
+      "not_owned": ["omwms.ai", "omlms.ai", "omtms.ai"],
+      "notes": "omwms.ai not registered. Considering wms.omsupplychain.ai subdomain strategy for supply chain products."
     },
     "tier3_future": {
       "description": "Reserved for future product expansion",
@@ -75,7 +78,6 @@
 
   "redirects": {
     "omquorum.com": "aiquorum.ai",
-    "omvoiceai.com": "omvoice.ai",
-    "omwms.ai": "omwms.com"
+    "omvoiceai.com": "omvoice.ai"
   }
 }
