@@ -42,7 +42,7 @@ try:
     from .storage import StorageBackend, LocalStorage
     from .tools import ToolModule
     from .tools.helpers import init_storage
-    from .tools import context, tasks, progress, documents, calendar, handoff, ai_quorum, incidents
+    from .tools import context, tasks, progress, documents, calendar, handoff, ai_quorum, incidents, dns_sentinel
 except ImportError as e:
     logger.critical(f"Failed to import local modules: {e}")
     logger.critical(f"Traceback:\n{traceback.format_exc()}")
@@ -157,6 +157,16 @@ def create_server(backend: Optional[StorageBackend] = None) -> Server:
         logger.error(f"Traceback:\n{traceback.format_exc()}")
         _incidents_mod = None
 
+    # DNS Sentinel module (Cloudflare DNS audit + auto-heal)
+    try:
+        _dns_sentinel_mod = dns_sentinel.register()
+        modules.append(_dns_sentinel_mod)
+        logger.info(f"DNS Sentinel module loaded ({len(_dns_sentinel_mod.tools)} tools)")
+    except Exception as e:
+        logger.error(f"Failed to load DNS Sentinel module: {e}")
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
+        _dns_sentinel_mod = None
+
     # Phase 4: Build tool lists and register context module
     try:
         _all_reading = context.READING.copy()
@@ -183,6 +193,9 @@ def create_server(backend: Optional[StorageBackend] = None) -> Server:
         if _incidents_mod:
             _all_reading += _incidents_mod.reading_tools
             _all_writing += _incidents_mod.writing_tools
+        if _dns_sentinel_mod:
+            _all_reading += _dns_sentinel_mod.reading_tools
+            _all_writing += _dns_sentinel_mod.writing_tools
 
         _context_mod = context.register(_all_reading, _all_writing)
         modules.insert(0, _context_mod)  # Context module first

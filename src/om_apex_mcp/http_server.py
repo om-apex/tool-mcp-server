@@ -134,8 +134,8 @@ def create_app() -> Starlette:
 
         # Count loaded tool modules
         try:
-            from .tools import context, tasks, progress, documents, calendar, handoff, ai_quorum
-            modules_loaded = 7  # All 7 tool modules
+            from .tools import context, tasks, progress, documents, calendar, handoff, ai_quorum, incidents, dns_sentinel
+            modules_loaded = 9  # All 9 tool modules
             checks["modules"] = {"status": "ok", "count": modules_loaded}
         except ImportError as e:
             checks["modules"] = {"status": "error", "error": str(e)}
