@@ -1,6 +1,6 @@
 # Database Schema Quick Reference
 
-> Last updated: 2026-02-23
+> Last updated: 2026-02-25
 
 ## Owner Portal (hympgocuivzxzxllgmcy)
 
@@ -127,6 +127,131 @@ Contact form submissions from all websites. Dual-write target (Supabase + HubSpo
 | created_at | TIMESTAMPTZ | Auto |
 
 **RLS:** Service role full access only. Indexes on `brand` and `email`.
+
+### dns_services
+Reusable DNS record templates (e.g., "google-workspace" = 5 MX + SPF + DKIM + DMARC).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT PK | Slug: `google-workspace`, `email-security-baseline`, `vercel-hosting`, `render-hosting`, `cloudflare-redirect` |
+| name | TEXT | Human-readable name |
+| description | TEXT | What this service provides |
+| provider | TEXT | Google, Vercel, Render, Cloudflare, internal |
+| record_templates | JSONB | Array of record objects with type/name/content/priority/ttl/proxied |
+| created_at | TIMESTAMPTZ | Auto |
+
+### dns_domain_config
+Per-domain source of truth. Links each domain to its tier, Cloudflare zone ID, and assigned services.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| domain | TEXT PK | e.g., `omapex.com` |
+| tier | INTEGER | 1–5 matching domain inventory tiers |
+| tier_label | TEXT | `active`, `near_term`, `future`, `brand_protection`, `discontinue` |
+| cloudflare_zone_id | TEXT | CF zone ID (populated by `dns_snapshot`) |
+| services | TEXT[] | Array of `dns_services.id` assigned to this domain |
+| redirect_target | TEXT | Target domain if redirect (e.g., `aiquorum.ai`) |
+| custom_records | JSONB | Domain-specific records not from a service template |
+| notes | TEXT | Human notes (includes email user info for email domains) |
+| last_audit_at | TIMESTAMPTZ | Last audit timestamp |
+| last_audit_status | TEXT | `pass`, `drift`, `error` |
+
+**21 domains seeded.** 4 email domains use `google-workspace`; 16 non-email use `email-security-baseline`; 2 redirects also use `cloudflare-redirect`; theomgroup.ai has no services (Tier 5, audit-only).
+
+### dns_policies
+Audit rules checked on every `dns_audit` run.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT PK | e.g., `global-spf-required`, `email-dkim-required` |
+| name | TEXT | Human-readable name |
+| scope | TEXT | `global`, `tier:1`, `service:google-workspace`, `domain:omapex.com` |
+| rule_type | TEXT | `record_required`, `record_forbidden`, `record_value_match` |
+| rule | JSONB | Check spec: `{type, name, content_startswith, content_contains, content_contains_any}` |
+| severity | TEXT | `critical`, `warning`, `info` |
+| auto_heal | BOOLEAN | Can Sentinel fix without approval? |
+| heal_action | JSONB | `{action: "add"/"upsert"/"add_if_missing", record: {...}}` |
+| enabled | BOOLEAN | Active or disabled |
+
+**15 policies seeded:** 3 global, 5 email-domain, 3 non-email, 1 Tier 1 CAA, 1 redirect, 1 Tier 5 audit-only.
+
+### dns_audit_log
+Full record of every audit run with findings and summary.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| run_id | TEXT | e.g., `AUDIT-20260225-143022` |
+| run_type | TEXT | `scheduled`, `manual`, `snapshot` |
+| domains_scanned | INTEGER | Count |
+| total_records_checked | INTEGER | Count |
+| findings | JSONB | Array of finding objects: `{domain, severity, policy_id, description, healed, queued_for_approval}` |
+| summary | JSONB | `{pass, drift, auto_healed, pending_approval}` |
+| triggered_by | TEXT | `manual`, `cron`, `claude` |
+| started_at / completed_at | TIMESTAMPTZ | Run timing |
+
+### dns_change_log
+Full audit trail of every DNS record modification.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| domain | TEXT | Which domain |
+| change_type | TEXT | `auto_heal`, `approved`, `manual`, `drift_detected` |
+| record_type | TEXT | A, CNAME, MX, TXT, CAA, etc. |
+| record_name | TEXT | `@`, `_dmarc`, `www`, etc. |
+| action | TEXT | `create`, `update`, `delete` |
+| before_value | JSONB | Full record before change (null for create) |
+| after_value | JSONB | Full record after change (null for delete) |
+| cloudflare_record_id | TEXT | CF record ID |
+| audit_run_id | TEXT | Links to dns_audit_log.run_id |
+| policy_id | TEXT | Which policy triggered this |
+| applied_by | TEXT | `sentinel`, `manual`, `claude` |
+| notes | TEXT | Context notes |
+| created_at | TIMESTAMPTZ | Auto |
+
+Index: `idx_dns_change_log_domain` on `(domain, created_at DESC)`
+
+### dns_approval_queue
+Changes that require human approval before applying to Cloudflare.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| domain | TEXT | Which domain |
+| record_type | TEXT | A, CNAME, MX, TXT, etc. |
+| record_name | TEXT | `@`, `_dmarc`, etc. |
+| action | TEXT | `create`, `update`, `delete` |
+| current_value | JSONB | Current record (null for create) |
+| proposed_value | JSONB | Proposed new record |
+| reason | TEXT | Why change is proposed |
+| risk_level | TEXT | `high`, `medium`, `low` |
+| status | TEXT | `pending`, `approved`, `rejected`, `expired` |
+| reviewed_by | TEXT | Who acted on it |
+| review_notes | TEXT | Notes from reviewer |
+| created_at | TIMESTAMPTZ | Auto |
+| expires_at | TIMESTAMPTZ | Auto-expires 7 days after creation |
+| audit_run_id | TEXT | Links to dns_audit_log.run_id |
+| policy_id | TEXT | Which policy triggered this |
+
+**Note:** Tier 5 domains (`theomgroup.ai`) are never queued — audit-only.
+
+Index: `idx_dns_approval_queue_status` on `(status, expires_at)`
+
+### dns_snapshots
+Raw Cloudflare DNS record snapshots per domain per run.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| domain | TEXT | Which domain |
+| records | JSONB | Full array of CF DNS records (as returned by Cloudflare API) |
+| record_count | INTEGER | Count of records |
+| taken_at | TIMESTAMPTZ | When snapshot was taken |
+
+Index: `idx_dns_snapshots_domain_taken` on `(domain, taken_at DESC)`
+
+**Usage:** `dns_view_snapshot` shows the latest snapshot per domain. Multiple snapshots per domain are retained for history.
 
 ---
 
@@ -427,3 +552,54 @@ Uses `1 - (embedding <=> query_embedding)` for cosine similarity.
 **match_knowledge(query_embedding, match_threshold, match_count)**
 Returns: `(id UUID, title TEXT, content TEXT, type TEXT, similarity FLOAT)`
 Uses `1 - (embedding <=> query_embedding)` for cosine similarity.
+
+### cortex_publish_log (Phase 5)
+Tracks every outbound publish attempt (Post This feature).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| turn_id | TEXT | AI Quorum turn ID being published |
+| user_id | TEXT | User who triggered publish |
+| channel | TEXT | `linkedin`, `x`, `whatsapp`, `telegram`, `email`, `slack`, `teams` |
+| status | TEXT | `queued`, `sent`, `failed` (CHECK constraint) |
+| content_type | TEXT | `verdict`, `insights`, `report` |
+| formatted_content | TEXT | Channel-formatted text |
+| verdict_card_url | TEXT | PNG URL in Supabase Storage |
+| error_message | TEXT | Error if failed (nullable) |
+| created_at | TIMESTAMPTZ | Auto |
+| sent_at | TIMESTAMPTZ | Null until sent |
+
+Indexes: `idx_publish_log_user` on `(user_id)`, `idx_publish_log_turn` on `(turn_id)`
+
+### cortex_oauth_tokens (Phase 5)
+Encrypted OAuth credentials per user/channel. Tokens stored with AES-256-GCM encryption.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| user_id | TEXT | User identifier |
+| channel | TEXT | `linkedin`, `x`, `slack` (OAuth channels) |
+| access_token | TEXT | AES-256-GCM encrypted |
+| refresh_token | TEXT | AES-256-GCM encrypted (nullable) |
+| expires_at | TIMESTAMPTZ | Token expiry (nullable) |
+| scopes | TEXT[] | Granted OAuth scopes |
+| created_at | TIMESTAMPTZ | Auto |
+| updated_at | TIMESTAMPTZ | Auto |
+
+Unique constraint: `(user_id, channel)`. Index: `idx_oauth_tokens_user_channel`.
+
+### cortex_channel_configs (Phase 5)
+Channel configuration and enable/disable state per user. Used for non-OAuth channels (WhatsApp, Telegram, Email, Teams) that use API keys/webhooks.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| user_id | TEXT | User identifier |
+| channel | TEXT | Channel name |
+| config | JSONB | Channel-specific config (apiKey, webhookUrl, phoneNumberId, etc.) |
+| enabled | BOOL | Default true |
+| created_at | TIMESTAMPTZ | Auto |
+| updated_at | TIMESTAMPTZ | Auto |
+
+Unique constraint: `(user_id, channel)`. Index: `idx_channel_configs_user`.
