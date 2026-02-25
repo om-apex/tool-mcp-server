@@ -390,32 +390,53 @@ def _check_record_policy(policy: dict, live_records: list[dict]) -> Optional[dic
     policy_id = policy.get("id", "")
     severity = policy.get("severity", "warning")
 
+    def _normalize_content(record: dict) -> str:
+        """Normalize TXT record content from Cloudflare.
+
+        Cloudflare returns long TXT records (>255 chars) with literal outer
+        quotes and internal quote-separated strings, e.g.:
+          '"v=spf1 include:google.com" "include:sendgrid.net ~all"'
+        Strip outer/inner quotes and join to get the plain value.
+        """
+        content = record.get("content", "")
+        if record.get("type", "").upper() == "TXT" and content.startswith('"'):
+            # Strip surrounding and internal quotes, join segments
+            content = content.replace('" "', "").strip('"')
+        return content
+
+    def _rec_name_matches_rule(rec_name: str, rule_name: str) -> bool:
+        """Match a live record name against a rule name.
+
+        Cloudflare returns full domain names in record name fields:
+        - Apex (@): "omapex.com"  (1 dot)
+        - _dmarc:   "_dmarc.omapex.com"  (contains rule name)
+        - subdomain: "google._domainkey.omapex.com"
+        """
+        rn = rec_name.lower()
+        rn_rule = rule_name.lower()
+        if rn_rule == "@":
+            # Apex: name is "@" or the bare domain (≤1 dot for .com/.ai)
+            return rn == "@" or rn.count(".") <= 1
+        return rn_rule in rn
+
     def matches_record(record: dict, rule: dict) -> bool:
         """Check if a live record matches the rule criteria."""
         if "type" in rule and record.get("type", "").upper() != rule["type"].upper():
             return False
         if "name" in rule:
-            rule_name = rule["name"]
-            rec_name = record.get("name", "")
-            # Cloudflare returns full domain in name for non-@ records
-            # We normalize by just checking if the record name starts with the rule name
-            if rule_name == "@":
-                # @ means apex — record name would be the domain itself or @
-                if rec_name not in ("@",) and not rec_name.startswith(rule_name):
-                    pass  # will match via content check
-            elif rule_name not in rec_name:
+            if not _rec_name_matches_rule(record.get("name", ""), rule["name"]):
                 return False
+        content = _normalize_content(record)
         if "content" in rule:
-            if record.get("content", "") != rule["content"]:
+            if content != rule["content"]:
                 return False
         if "content_contains" in rule:
-            if rule["content_contains"] not in record.get("content", ""):
+            if rule["content_contains"] not in content:
                 return False
         if "content_startswith" in rule:
-            if not record.get("content", "").startswith(rule["content_startswith"]):
+            if not content.startswith(rule["content_startswith"]):
                 return False
         if "content_contains_any" in rule:
-            content = record.get("content", "")
             if not any(s in content for s in rule["content_contains_any"]):
                 return False
         if "proxied" in rule:
@@ -458,20 +479,10 @@ def _check_record_policy(policy: dict, live_records: list[dict]) -> Optional[dic
         # Find the record type+name, then check if value matches.
         # Cloudflare returns apex records with the full domain name (e.g. "omcortex.ai")
         # rather than "@", so we treat "@" as matching any apex record.
-        rule_name = rule.get("name", "").lower()
-
-        def _name_matches(rec_name: str) -> bool:
-            rn = rec_name.lower()
-            if rule_name == "@":
-                # Cloudflare returns apex records as either "@" or the bare domain name
-                # (e.g., "omcortex.ai"). Apex names have at most one dot (.com/.ai).
-                # Subdomains (_dmarc.omcortex.ai, www.omcortex.ai) have 2+ dots.
-                return rn == "@" or rn.count(".") <= 1
-            return rule_name in rn
-
+        rule_name = rule.get("name", "")
         target_records = [r for r in live_records
                           if r.get("type", "").upper() == rule.get("type", "").upper()
-                          and _name_matches(r.get("name", ""))]
+                          and _rec_name_matches_rule(r.get("name", ""), rule_name)]
         if not target_records:
             return {
                 "policy_id": policy_id,
