@@ -455,10 +455,23 @@ def _check_record_policy(policy: dict, live_records: list[dict]) -> Optional[dic
         }
 
     elif rule_type == "record_value_match":
-        # Find the record type+name, then check if value matches
+        # Find the record type+name, then check if value matches.
+        # Cloudflare returns apex records with the full domain name (e.g. "omcortex.ai")
+        # rather than "@", so we treat "@" as matching any apex record.
+        rule_name = rule.get("name", "").lower()
+
+        def _name_matches(rec_name: str) -> bool:
+            rn = rec_name.lower()
+            if rule_name == "@":
+                # Cloudflare returns apex records as either "@" or the bare domain name
+                # (e.g., "omcortex.ai"). Apex names have at most one dot (.com/.ai).
+                # Subdomains (_dmarc.omcortex.ai, www.omcortex.ai) have 2+ dots.
+                return rn == "@" or rn.count(".") <= 1
+            return rule_name in rn
+
         target_records = [r for r in live_records
                           if r.get("type", "").upper() == rule.get("type", "").upper()
-                          and rule.get("name", "").lower() in r.get("name", "").lower()]
+                          and _name_matches(r.get("name", ""))]
         if not target_records:
             return {
                 "policy_id": policy_id,
@@ -568,13 +581,23 @@ async def _apply_heal_action(domain: str, zone_id: str, finding: dict, dry_run: 
             result["applied"] = False
         else:
             try:
-                cf_record = await create_dns_record(zone_id, {
-                    "type": record["type"],
-                    "name": record["name"],
-                    "content": record.get("content", ""),
-                    "ttl": record.get("ttl", 3600),
-                    "proxied": record.get("proxied", False),
-                })
+                # CAA records use data object, not content string
+                if record.get("type") == "CAA" and "data" in record:
+                    cf_payload = {
+                        "type": "CAA",
+                        "name": record["name"],
+                        "data": record["data"],
+                        "ttl": record.get("ttl", 3600),
+                    }
+                else:
+                    cf_payload = {
+                        "type": record["type"],
+                        "name": record["name"],
+                        "content": record.get("content", ""),
+                        "ttl": record.get("ttl", 3600),
+                        "proxied": record.get("proxied", False),
+                    }
+                cf_record = await create_dns_record(zone_id, cf_payload)
                 _log_change({
                     "domain": domain,
                     "change_type": "auto_heal",
@@ -1021,6 +1044,9 @@ async def _handle_dns_heal(args: dict) -> list[TextContent]:
             continue
 
         policies = _get_policies_for_domain(config)
+        # Track (record_type, record_name) pairs healed this domain to avoid
+        # redundant policy failures after adding a record mid-loop
+        healed_records: set[tuple] = set()
 
         for policy in policies:
             finding = _check_record_policy(policy, live_records)
@@ -1029,8 +1055,17 @@ async def _handle_dns_heal(args: dict) -> list[TextContent]:
 
             finding["domain"] = domain
 
+            # Skip if we already healed this record type+name this pass
+            heal_action = finding.get("heal_action") or {}
+            heal_record = heal_action.get("record", {})
+            rec_key = (heal_record.get("type", ""), heal_record.get("name", ""))
+            if rec_key[0] and rec_key in healed_records:
+                continue
+
             if _is_safe_to_auto_heal(finding, domain):
                 result = await _apply_heal_action(domain, zone_id, finding, dry_run=dry_run, run_id=run_id)
+                if result.get("applied") or dry_run:
+                    healed_records.add(rec_key)
                 healed.append({
                     "domain": domain,
                     "policy": policy.get("id"),
