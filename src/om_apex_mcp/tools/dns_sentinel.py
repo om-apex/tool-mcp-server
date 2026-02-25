@@ -790,7 +790,7 @@ async def _handle_dns_audit(args: dict) -> list[TextContent]:
                     finding["healed"] = True
                     healed.append(heal_result)
                     continue
-            elif not _is_safe_to_auto_heal(finding, domain) and finding.get("heal_action"):
+            elif not _is_safe_to_auto_heal(finding, domain) and finding.get("heal_action") and domain not in AUDIT_ONLY_DOMAINS:
                 # Queue for approval if there's a proposed action
                 heal_action = finding.get("heal_action") or {}
                 record = heal_action.get("record")
