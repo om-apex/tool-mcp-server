@@ -32,13 +32,17 @@ class TestDataLoading:
     def test_load_domain_inventory(self):
         """Test loading domain inventory."""
         data = load_json("domain_inventory.json")
-        assert data.get("summary", {}).get("total_domains") == 20
+        # Domain count varies by environment (live data, 20+ domains)
+        assert data.get("summary", {}).get("total_domains", 0) >= 20
 
     def test_load_pending_tasks(self):
-        """Test loading pending tasks."""
+        """Test loading pending tasks file doesn't crash.
+
+        Tasks have moved to Supabase — this JSON file may be empty ({}) or absent.
+        Test only verifies the load call succeeds.
+        """
         data = load_json("pending_tasks.json")
-        assert "tasks" in data
-        assert len(data["tasks"]) > 0
+        assert isinstance(data, dict)
 
 
 class TestCompanyContext:
@@ -103,6 +107,28 @@ class TestModuleRegistration:
         assert "generate_branded_html" in all_tools
         assert "list_company_configs" in all_tools
 
+    def test_dns_sentinel_module_loads(self):
+        """Test that dns_sentinel module registers its 10 tools."""
+        from om_apex_mcp.tools import dns_sentinel
+        mod = dns_sentinel.register()
+        tool_names = [t.name for t in mod.tools]
+        assert len(tool_names) == 10
+        assert "dns_audit" in tool_names
+        assert "dns_snapshot" in tool_names
+        assert "dns_heal" in tool_names
+        assert "dns_view_approvals" in tool_names
+        assert "dns_approve" in tool_names
+        assert "dns_reject" in tool_names
+
+    def test_incidents_module_loads(self):
+        """Test that incidents module registers its 2 tools."""
+        from om_apex_mcp.tools import incidents
+        mod = incidents.register()
+        tool_names = [t.name for t in mod.tools]
+        assert len(tool_names) == 2
+        assert "incident_create" in tool_names
+        assert "incident_list" in tool_names
+
 
 class TestStorageBackend:
     """Test storage backend abstraction."""
@@ -139,8 +165,8 @@ class TestStorageBackend:
 
     def test_local_storage_text_roundtrip(self, tmp_path):
         """Test read/write/append text with LocalStorage."""
+        # LocalStorage.__init__ auto-creates the data dir — no need to mkdir manually
         backend = LocalStorage(data_dir=tmp_path / "data", shared_drive_root=tmp_path)
-        (tmp_path / "data").mkdir()
 
         backend.write_text("test.md", "Hello\n")
         assert backend.read_text("test.md") == "Hello\n"
