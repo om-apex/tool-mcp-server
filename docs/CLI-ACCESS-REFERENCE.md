@@ -1,6 +1,6 @@
 # CLI Access Reference
 
-> Last updated: 2026-02-21
+> Last updated: 2026-02-26
 
 ## Installed CLIs
 
@@ -42,10 +42,14 @@ supabase db push
 
 | Project | URL | Platform |
 |---------|-----|----------|
+| Om Apex / Owner Portal | https://om-apex-site.vercel.app | Vercel |
+| Om AI Solutions website | https://om-ai-site.vercel.app | Vercel |
+| Om Luxe Properties website | https://om-luxe-site.vercel.app | Vercel |
+| Om Supply Chain website | https://om-scm-site.vercel.app | Vercel |
 | AI Quorum Frontend | https://frontend-eosin-one-68.vercel.app | Vercel |
-| AI Quorum Backend | Render service `srv-d5snc28gjchc73b2se10` | Render |
-| Owner Portal | https://om-apex-site.vercel.app | Vercel |
-| Om Cortex Backend | https://om-cortex.onrender.com | Render (`srv-d67jupngi27c739uj4ag`) |
+| AI Quorum Backend | https://product-ai-quorum.onrender.com | Render |
+| Om Cortex Backend | https://om-cortex.onrender.com | Render |
+| MCP Server | https://om-apex-mcp.onrender.com | Render |
 
 ## Local Development Ports
 
@@ -120,12 +124,46 @@ om-apex/
 
 **Org:** `om-apex` (https://github.com/om-apex)
 
-| Repo | Project |
-|------|---------|
-| `tool-mcp-server` | MCP Server |
-| `ai-quorum` | AI Quorum product |
-| `product-om-cortex` | Om Cortex product |
-| `om-apex-site` | Owner Portal website |
+| Repo | Project | Category |
+|------|---------|----------|
+| `website-apex` | Om Apex Holdings website + Owner Portal | Website |
+| `website-ai-solutions` | Om AI Solutions website | Website |
+| `website-luxe-properties` | Om Luxe Properties website | Website |
+| `website-supply-chain` | Om Supply Chain website | Website |
+| `product-ai-quorum` | AI Quorum | Product |
+| `product-om-cortex` | Om Cortex | Product |
+| `product-om-vision-picking` | Om Vision Picking | Product |
+| `tool-mcp-server` | MCP Server | Tool |
+| `dotfiles` | Shared dotfiles (.zshrc, CLAUDE.md) | Config |
+
+**Personal account:** `nishad-apex` — contains `ai-quorum-vision` (Lovable-managed, deployed to Vercel `frontend` project)
+
+## Service Connections
+
+> **WARNING:** Do not disconnect Vercel or Render git integrations. Reconnecting requires API-level work.
+
+### Vercel → GitHub
+
+| Vercel Project | GitHub Repo | Auto-deploy |
+|---|---|---|
+| `om-apex-site` | `om-apex/website-apex` | Yes (main) |
+| `om-luxe-site` | `om-apex/website-luxe-properties` | Yes (main) |
+| `om-ai-site` | `om-apex/website-ai-solutions` | Yes (main) |
+| `om-scm-site` | `om-apex/website-supply-chain` | Yes (main) |
+| `frontend` | `nishad-apex/ai-quorum-vision` | Yes (main) |
+
+- Vercel account: `nishad-apex` (team: `nishad-tambes-projects`)
+- GitHub App installation ID: `112715183` (installed on `om-apex` org)
+
+### Render → GitHub
+
+| Render Service | Service ID | GitHub Repo | Auto-deploy |
+|---|---|---|---|
+| `om-apex-mcp` | `srv-d5snc28gjchc73b2se10` | `om-apex/tool-mcp-server` | Yes (main) |
+| `product-ai-quorum` | `srv-d60m0r63jp1c73a8fthg` | `om-apex/product-ai-quorum` (root: `backend`) | Yes (main) |
+| `om-cortex` | `srv-d67jupngi27c739uj4ag` | `om-apex/product-om-cortex` | Yes (main) |
+
+- Render workspace: `tea-d5smshe3jp1c738d4s9g`
 
 ## Common Render Commands
 
