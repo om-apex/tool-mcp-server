@@ -42,7 +42,8 @@ supabase db push
 
 | Project | URL | Platform |
 |---------|-----|----------|
-| Om Apex / Owner Portal | https://om-apex-site.vercel.app | Vercel |
+| Om Apex Public Site | https://om-apex-site.vercel.app | Vercel |
+| Owner Portal | https://om-portal.vercel.app | Vercel |
 | Om AI Solutions website | https://om-ai-site.vercel.app | Vercel |
 | Om Luxe Properties website | https://om-luxe-site.vercel.app | Vercel |
 | Om Supply Chain website | https://om-scm-site.vercel.app | Vercel |
@@ -58,7 +59,8 @@ supabase db push
 | AI Quorum | 3000 | `products/ai-quorum/` |
 | Om Cortex Backend | 9000 | `products/om-cortex/backend/` |
 | Om Cortex Mission Control | 3005 | `products/om-cortex/frontend/` |
-| Owner Portal | 3001 | `websites/apex/` |
+| Apex Public Site | 3001 | `websites/apex/` |
+| Owner Portal | 3006 | `websites/portal/` |
 | AI Solutions | 3002 | `websites/ai-solutions/` |
 | Supply Chain | 3003 | `websites/supply-chain/` |
 | Luxe Properties | 3004 | `websites/luxe-properties/` |
@@ -106,7 +108,8 @@ om-apex/
 ├── products/ai-quorum/          # AI Quorum (Next.js + FastAPI)
 ├── products/om-cortex/          # Om Cortex (TypeScript + Hono, port 9000)
 ├── websites/
-│   ├── apex/                    # Owner Portal (Next.js, port 3001)
+│   ├── apex/                    # Apex Public Site (Next.js, port 3001)
+│   ├── portal/                  # Owner Portal (Next.js, port 3006)
 │   ├── ai-solutions/            # omaisolutions.com
 │   ├── luxe-properties/         # omluxeproperties.com
 │   └── supply-chain/            # omsupplychain.com
@@ -126,7 +129,8 @@ om-apex/
 
 | Repo | Project | Category |
 |------|---------|----------|
-| `website-apex` | Om Apex Holdings website + Owner Portal | Website |
+| `website-apex` | Om Apex Holdings public website | Website |
+| `portal-owner` | Owner Portal dashboard | Website |
 | `website-ai-solutions` | Om AI Solutions website | Website |
 | `website-luxe-properties` | Om Luxe Properties website | Website |
 | `website-supply-chain` | Om Supply Chain website | Website |
@@ -147,6 +151,7 @@ om-apex/
 | Vercel Project | GitHub Repo | Auto-deploy |
 |---|---|---|
 | `om-apex-site` | `om-apex/website-apex` | Yes (main) |
+| `om-portal` | `om-apex/portal-owner` | Yes (main) |
 | `om-luxe-site` | `om-apex/website-luxe-properties` | Yes (main) |
 | `om-ai-site` | `om-apex/website-ai-solutions` | Yes (main) |
 | `om-scm-site` | `om-apex/website-supply-chain` | Yes (main) |
@@ -189,7 +194,8 @@ Each Supabase project with auth must allow localhost redirects. Without this, OA
 
 | Supabase Project | Dashboard → Authentication → URL Configuration |
 |---|---|
-| Owner Portal (`hympgocuivzxzxllgmcy`) | Add `http://localhost:3001/**` |
+| Apex Public Site (`hympgocuivzxzxllgmcy`) | Add `http://localhost:3001/**` |
+| Owner Portal (`hympgocuivzxzxllgmcy`) | Add `http://localhost:3006/**` and `https://portal.omapex.com/**` |
 | AI Quorum (`ixncscosicyjzlopbfiz`) | Add `http://localhost:3000/**` |
 
 **Required redirect URLs per project** (all should be present):
