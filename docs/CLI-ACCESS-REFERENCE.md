@@ -1,14 +1,15 @@
 # CLI Access Reference
 
-> Last updated: 2026-02-26
+> Last updated: 2026-02-27
 
 ## Installed CLIs
 
 | CLI | Command | Auth Status | Account |
 |-----|---------|-------------|---------|
 | Supabase | `supabase` | Authenticated | nishad@omapex.com |
-| Vercel | `vercel` | Logged in | nishad-apex |
-| Render | `render` | Logged in | nishad@omapex.com |
+| Vercel | `vercel` (v50.9.6) | Logged in | nishad-apex |
+| Render | `render` (v2.7.1) | Logged in | nishad@omapex.com |
+| psql | `/opt/homebrew/opt/libpq/bin/psql` (v18.3) | N/A | Direct DB connection (installed via `brew install libpq`) |
 | Cloudflare | `wrangler` | Token-based | `~/om-apex/config/.env.cloudflare` |
 | GitHub | `gh` | Logged in | nishad-apex |
 | Google Cloud | `gcloud` | Logged in | nishad@omapex.com |
@@ -28,6 +29,26 @@
 - AI Quorum is linked in: `~/om-apex/products/ai-quorum/`
 - Owner Portal NOT linked — use temp dir workaround to push migrations
 - `supabase migration repair --status applied/reverted <version>` to fix sync issues
+
+**Supabase Management API (migration fallback):**
+
+When `supabase db push` fails due to migration history mismatches (e.g., remote has versions not in local), use the Management API to execute SQL directly:
+
+```bash
+# Get access token from macOS keychain (base64-encoded with "go-keyring-base64:" prefix)
+TOKEN=$(security find-generic-password -s "Supabase CLI" -w | sed 's/go-keyring-base64://' | base64 -d)
+
+# Execute SQL against any Supabase project
+curl -s -X POST "https://api.supabase.com/v1/projects/<project-ref>/database/query" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT 1"}'
+
+# After manual SQL execution, mark migration as applied in history:
+supabase migration repair --status applied <version>
+```
+
+**Known migration history issue (2026-02-27):** AI Quorum has a persistent mismatch on version `20260225` — remote and local both have the version but the CLI doesn't match them (shows on separate rows in `supabase migration list`). This was caused by a migration being applied on one machine and repaired on another. Does not affect operations — just means `supabase db push` may fail. Use the Management API workaround above.
 
 **Owner Portal workaround:**
 ```bash
@@ -155,10 +176,19 @@ om-apex/
 | `om-luxe-site` | `om-apex/website-luxe-properties` | Yes (main) |
 | `om-ai-site` | `om-apex/website-ai-solutions` | Yes (main) |
 | `om-scm-site` | `om-apex/website-supply-chain` | Yes (main) |
-| `frontend` | `nishad-apex/ai-quorum-vision` | Yes (main) |
+| `frontend` | `nishad-apex/ai-quorum-vision` | **Unreliable** — see note below |
 
 - Vercel account: `nishad-apex` (team: `nishad-tambes-projects`)
 - GitHub App installation ID: `112715183` (installed on `om-apex` org)
+
+**AI Quorum Vercel auto-deploy issue (2026-02-27):**
+The `frontend` Vercel project is linked to `nishad-apex/ai-quorum-vision` (personal account), but the actual code is pushed to `om-apex/product-ai-quorum` (org account). Pushes to the org repo do NOT trigger Vercel auto-deploys because Vercel watches the personal account repo. To deploy frontend changes:
+```bash
+cd ~/om-apex/products/ai-quorum/frontend && vercel --prod --yes
+```
+This uploads the local build directly. Long-term fix: re-link the Vercel `frontend` project to `om-apex/product-ai-quorum` with root directory set to `frontend/`.
+
+**Accidental Vercel project creation warning:** Running `vercel ls` from the repo root (not `frontend/`) may auto-create a new Vercel project named `ai-quorum`. This happened on 2026-02-27 — the empty project was created at `/Users/nishad/om-apex/products/ai-quorum/.vercel/`. If this happens, delete the `.vercel/` directory from the repo root and only run Vercel commands from the `frontend/` subdirectory.
 
 ### Render → GitHub
 
@@ -176,8 +206,21 @@ om-apex/
 render logs -r srv-d5snc28gjchc73b2se10 --limit 50 -o text
 render deploys create srv-d5snc28gjchc73b2se10 --confirm -o json
 render services -o json
+
+# List recent deploys for a service (JSON output for parsing)
+render deploys list srv-d60m0r63jp1c73a8fthg -o json
+
+# Parse deploy status from JSON
+render deploys list <service-id> -o json | python3 -c '
+import json, sys
+for d in json.load(sys.stdin)[:3]:
+    deploy = d.get("deploy", d)
+    print(f"{deploy[\"status\"]:15s} | {deploy[\"createdAt\"][:19]} | {deploy.get(\"commit\",{}).get(\"message\",\"manual\")[:60]}")
+'
 ```
 **Workspace:** Om Apex Holdings (`tea-d5smshe3jp1c738d4s9g`)
+
+**Render auto-deploy:** Works reliably for all services. Pushes to `main` on the linked GitHub repo trigger automatic deploys. Build time is typically 8-10 minutes for AI Quorum backend.
 
 ## Deploy Scripts
 
@@ -290,6 +333,10 @@ Result: 5/5 models responding
 6. **Cloudflare** — requires token from env: `CLOUDFLARE_API_TOKEN=$(grep CLOUDFLARE_API_TOKEN ~/om-apex/config/.env.cloudflare | cut -d= -f2) wrangler whoami`
 7. **Google Cloud** — may need `gcloud auth login` to refresh tokens
 8. **OAuth redirects to production from localhost** — Missing localhost in Supabase Auth redirect URLs. See "Local Development Setup Checklist" above
+9. **AI Quorum Vercel auto-deploy broken** — `frontend` Vercel project watches `nishad-apex/ai-quorum-vision` (personal repo) but code lives in `om-apex/product-ai-quorum` (org repo). Must deploy manually: `cd frontend && vercel --prod --yes`. See Vercel → GitHub section for details.
+10. **`supabase db push` migration history mismatch** — AI Quorum has a persistent conflict on version `20260225`. Use Supabase Management API as workaround (see Supabase Projects section). After executing SQL manually, always run `supabase migration repair --status applied <version>`.
+11. **`vercel ls` from wrong directory** — Running Vercel CLI from repo root (not `frontend/`) will auto-create a new Vercel project and `.vercel/` directory. Always `cd frontend` first.
+12. **psql not on PATH** — Installed via `brew install libpq` but not linked. Use full path: `/opt/homebrew/opt/libpq/bin/psql`
 
 ## MCP Server
 
