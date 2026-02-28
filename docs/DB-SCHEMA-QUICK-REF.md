@@ -442,6 +442,37 @@ For each active marketing channel, creates a draft coupon with source='weekly', 
 ### Additional Config Tables (orch_*)
 The orchestration engine has several config tables for stages, model slots, prompt templates, and taxonomy. These are seeded via migrations and rarely queried directly. See migration files in `products/ai-quorum/supabase/migrations/` for full schema.
 
+### orch_stage_prompt_history (added 2026-02-28)
+Audit trail for prompt template changes. Stores previous version before each UPDATE.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| stage_id | UUID FK | References orch_stages(id) |
+| stage_code | VARCHAR(20) | Stage code (QUALIFY, UNVEIL, etc.) |
+| prompt_template | TEXT | Previous template content |
+| changed_by | VARCHAR | Default 'migration' |
+| change_reason | TEXT | Why the change was made |
+| created_at | TIMESTAMPTZ | Auto |
+
+### orch_stages — new columns (2026-02-28)
+| Column | Type | Notes |
+|--------|------|-------|
+| prompt_version | INTEGER | Auto-incremented on prompt updates (default 1) |
+
+### orch_turns — new columns (2026-02-28)
+| Column | Type | Notes |
+|--------|------|-------|
+| user_rating_value | INTEGER | Value-for-credits rating (1-5), CHECK constraint |
+
+### RPC Functions (Stats — added 2026-02-28)
+
+**fn_user_usage_stats(p_user_id UUID, p_period TEXT)**
+Returns per-user usage stats for a time period (day/week/month/quarter/year). Output: period_label, total_queries, queries_by_mode (JSONB), queries_by_taxonomy_l1 (JSONB), total_credits_used, avg_credits_per_query, credits_by_mode (JSONB), total_shares. Sources: orch_sessions + orch_turns + credit_transactions.
+
+**fn_global_usage_stats(p_period TEXT)**
+Returns anonymized community-wide stats. Same shape as fn_user_usage_stats plus avg_queries_per_user. Does NOT expose total_users.
+
 ---
 
 ## Om Cortex (sgcfettixymowtokytwk)
