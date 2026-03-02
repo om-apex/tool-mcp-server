@@ -1,108 +1,50 @@
 # Om Apex MCP Server
 
-## Project Overview
+Model Context Protocol server providing persistent memory and tools across all Claude interfaces. 54 tools across 9 modules.
 
-This is a Model Context Protocol (MCP) server for Om Apex Holdings. It provides persistent memory across all Claude interfaces (Chat, Cowork, Claude Code).
+## Architecture
+- **Language:** Python 3.12
+- **MCP SDK:** `mcp>=1.0.0` (official Python SDK)
+- **Entry point (stdio):** `src/om_apex_mcp/server.py` — for Claude Desktop
+- **Entry point (HTTP):** `src/om_apex_mcp/http_server.py` — for Claude Code, remote access
+- **Deployment:** Docker on Render (`srv-d5snc28gjchc73b2se10`)
+- **URL:** https://om-apex-mcp.onrender.com
 
-**Owner:** Nishad Tambe (nishad@omapex.com)
-**Started:** January 19, 2026
+## Data Sources
 
-## Business Context
+| Project | Ref | Used For |
+|---------|-----|----------|
+| Owner Portal | `hympgocuivzxzxllgmcy` | Tasks, decisions, handoff, documents, DNS |
+| AI Quorum | `ixncscosicyjzlopbfiz` | Quorum diagnostics (sessions, turns, config) |
+| Om Cortex | `sgcfettixymowtokytwk` | Production incidents |
 
-### Om Apex Holdings LLC (Parent Company)
-- **Ownership:** Nishad Tambe (50%) + Sumedha Tambe (50%)
-- **Domain:** omapex.com
+Also: Cloudflare API (DNS Sentinel), Google Calendar API, Google Drive (local or API).
 
-### Subsidiaries
+## Tool Modules (54 tools)
 
-1. **Om Luxe Properties LLC** - Vacation rentals
-   - Currently operating "Perch in the Clouds" in Ellijay, GA
-   - Managed by Home Team Luxury Rentals at 22% commission
-   - Domain: omluxeproperties.com
+| Module | File | Tools | Purpose |
+|--------|------|-------|---------|
+| Context | `tools/context.py` | 7 | Company info, tech stack, CLI status |
+| Tasks | `tools/tasks.py` | 6 | Task CRUD via Supabase |
+| Progress | `tools/progress.py` | 3 | Session logging to files |
+| Documents | `tools/documents.py` | 11 | Document generation + branding |
+| Calendar | `tools/calendar.py` | 3 | Google Calendar API |
+| Handoff | `tools/handoff.py` | 2 | Cross-device session state |
+| AI Quorum | `tools/ai_quorum.py` | 10 | Quorum product diagnostics |
+| Incidents | `tools/incidents.py` | 2 | Production incident tracking |
+| DNS Sentinel | `tools/dns_sentinel.py` | 10 | DNS audit, auto-heal, change mgmt |
 
-2. **Om AI Solutions LLC** - AI-powered supply chain software
-   - Domain: omaisolutions.com
-   - Products planned:
-     - Self-Learning WMS (Core - MVP Q2 2026)
-     - Warehouse Maturity Study (Consulting)
-     - AI Maturity Study (Consulting)
-     - Voice Agents for SMBs
-     - Enterprise MCP Knowledge Base Server ← THIS PROJECT IS THE POC
+## Reference Docs (in `docs/`)
 
-## Tech Stack Decisions
+| File | Contents |
+|------|----------|
+| `CLI-ACCESS-REFERENCE.md` | CLIs, project map, ports, config, gotchas |
+| `DB-SCHEMA-QUICK-REF.md` | Table schemas for all Supabase projects |
+| `TEAM-PROTOCOL.md` | Multi-agent coordination, roles, sizing |
+| `SESSION-OPS.md` | Session start flow, .zshrc reference, known quirks |
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | Next.js 15 + Tailwind + Shadcn UI (Vercel) |
-| Backend | Python + FastAPI (Render) |
-| Database | Supabase (Postgres + RLS + Realtime) |
-| AI Agents | LangGraph + Claude API |
-| MCP | Official Python SDK |
-
-## This Project's Purpose
-
-1. **Immediate:** Solve Nishad's memory problem across Claude windows
-2. **Strategic:** Proof of concept for Enterprise MCP Knowledge Base product
-3. **Documentation:** Create a how-to guide for customers
-
-## Project Structure
-
-```
-om-apex-mcp/
-├── src/om_apex_mcp/
-│   ├── server.py          # Main MCP server (TO BUILD)
-│   ├── tools/             # MCP tools
-│   └── resources/         # MCP resources
-├── data/
-│   ├── context/           # Business context JSON ✅ EXISTS
-│   └── documents/         # Document store
-├── docs/
-│   └── BUILD_JOURNAL.md   # Development journal ✅ EXISTS
-└── tests/
-```
-
-## Current Phase
-
-**Day 1 Complete (Cowork):** Project structure, context extraction, documentation
-**Day 2 Pending (Claude Code):** Build the actual MCP server
-
-## What to Build Next
-
-1. `pyproject.toml` with dependencies (mcp, fastapi, pydantic)
-2. `src/om_apex_mcp/server.py` - Main MCP server
-3. Tools to implement:
-   - `get_company_context` - Returns company structure
-   - `get_decisions` - Returns tech decisions
-   - `get_tasks` - Returns pending tasks
-   - `add_task` / `complete_task` - Task management
-   - `search_documents` - Search knowledge base
-4. Test the server locally
-5. Configure Claude Desktop to connect
-
-## Important Files
-
-- `data/context/company_structure.json` - Company info
-- `data/context/technology_decisions.json` - Tech stack decisions
-- `data/context/domain_inventory.json` - 20 domains
-- `data/context/pending_tasks.json` - Current tasks
-- `docs/BUILD_JOURNAL.md` - Development journal (UPDATE THIS!)
-
-## Commands Reference
-
-```bash
-# Install dependencies (after pyproject.toml exists)
-pip install -e .
-
-# Run MCP server for testing
-python -m om_apex_mcp.server
-
-# Run tests
-pytest tests/
-```
-
-## Notes for Claude
-
-- This project uses Python (matching Om AI Solutions architecture)
-- Update BUILD_JOURNAL.md as you make progress
-- The goal is both a working server AND comprehensive documentation
-- Nishad plans to publish a how-to guide, so document everything clearly
+## Key Patterns
+- Modular tool registration — each module loads independently, failure of one doesn't crash server
+- Lazy singleton Supabase clients — no exceptions raised (returns None on failure)
+- HTTP/1.1 forced to avoid stream resets
+- Demo mode with 13 read-only tools (no API key required)
