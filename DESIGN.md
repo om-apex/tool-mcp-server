@@ -2,7 +2,7 @@
 
 ## Overview
 
-Model Context Protocol (MCP) server providing persistent memory and tools across all Claude interfaces (Chat, Cowork, Claude Code). 54 tools across 9 modules for managing company context, tasks, decisions, documents, calendar, session handoffs, AI Quorum diagnostics, production incidents, and DNS security.
+Model Context Protocol (MCP) server providing persistent memory and tools across all Claude interfaces (Chat, Cowork, Claude Code). 55 tools across 9 modules for managing company context, tasks, decisions, documents, calendar, session handoffs, AI Quorum diagnostics, production incidents, and DNS security.
 
 ## Tech Stack
 
@@ -66,12 +66,12 @@ mcp-server/
 - `GET /health` — Health check (public, no auth)
 - `POST /mcp/*` — Streamable HTTP MCP endpoint (requires auth)
 
-## Tool Modules (54 tools)
+## Tool Modules (55 tools)
 
 | Module | Tools | Key Functions |
 |--------|-------|--------------|
 | **Context** (7) | get_full_context, get_company_context, get_technology_decisions, get_domain_inventory, get_cli_status, get_claude_instructions, get_decisions_history | Company info, tech stack, CLI status |
-| **Tasks** (6) | get_pending_tasks, get_task_queue, add_task, complete_task, update_task_status, update_task | Task CRUD via Supabase |
+| **Tasks** (7) | get_pending_tasks, get_task_queue, add_task, complete_task, update_task_status, update_task, force_complete | Task CRUD via Supabase |
 | **Progress** (3) | get_daily_progress, add_daily_progress, search_daily_progress | Session logging to files |
 | **Documents** (11) | generate_branded_html, generate_company_document, view/list/create/update/delete templates, get_brand_assets, list_company_configs, sync_templates | Document generation + branding |
 | **Calendar** (3) | list_calendar_events, create_calendar_event, delete_calendar_event | Google Calendar API |
@@ -114,7 +114,7 @@ Used for: production incident tracking (prodsupport_incidents)
 
 | Level | Access | Mechanism |
 |-------|--------|-----------|
-| Full | All 54 tools | `X-API-Key` header with valid key |
+| Full | All 55 tools | `X-API-Key` header with valid key |
 | Demo | 13 read-only tools | `OM_APEX_DEMO_MODE=true`, no key |
 | None | 401 error | No key, demo disabled |
 

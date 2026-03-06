@@ -162,6 +162,7 @@ def get_tasks(
     status: Optional[str] = None,
     owner: Optional[str] = None,
     task_type: Optional[str] = None,
+    source: Optional[str] = None,
 ) -> list[dict]:
     """Get tasks from Supabase with optional filters.
 
@@ -186,6 +187,8 @@ def get_tasks(
             query = query.ilike("owner", owner)
         if task_type:
             query = query.eq("task_type", task_type)
+        if source:
+            query = query.ilike("source", source)
 
         response = query.order("created_at", desc=True).execute()
         return response.data or []
@@ -304,6 +307,7 @@ def get_task_queue(
     priority: Optional[str] = None,
     status: Optional[str] = None,
     company: Optional[str] = None,
+    source: Optional[str] = None,
 ) -> list[dict]:
     """Get a compact task queue sorted by priority then age.
 
@@ -330,11 +334,11 @@ def get_task_queue(
             "id, description, priority, status, owner, company, created_at"
         )
 
-        # Status filter: default to pending + in_progress
+        # Status filter: default to all non-complete tasks
         if status:
             query = query.ilike("status", status)
         else:
-            query = query.or_("status.eq.pending,status.eq.in_progress")
+            query = query.neq("status", "complete")
 
         if owner:
             query = query.ilike("owner", owner)
@@ -342,6 +346,8 @@ def get_task_queue(
             query = query.ilike("priority", priority)
         if company:
             query = query.ilike("company", company)
+        if source:
+            query = query.ilike("source", source)
 
         # Fetch more than needed, sort in Python by priority then age
         response = query.order("created_at", desc=False).limit(limit * 3).execute()
@@ -477,7 +483,7 @@ def get_task_count() -> dict:
         Dictionary with total, pending, in_progress, completed, high_priority counts.
         Returns zeros on error.
     """
-    default_counts = {"total": 0, "pending": 0, "in_progress": 0, "completed": 0, "high_priority": 0}
+    default_counts = {"total": 0, "active": 0, "complete": 0, "high_priority": 0}
 
     try:
         client = get_supabase_client()
@@ -488,16 +494,14 @@ def get_task_count() -> dict:
         all_tasks = client.table("tasks").select("status, priority").execute()
         tasks = all_tasks.data or []
 
-        pending = [t for t in tasks if t.get("status") == "pending"]
-        in_progress = [t for t in tasks if t.get("status") == "in_progress"]
-        completed = [t for t in tasks if t.get("status") == "completed"]
-        high_priority = [t for t in tasks if t.get("priority") == "High" and t.get("status") != "completed"]
+        complete = [t for t in tasks if t.get("status") == "complete"]
+        active = [t for t in tasks if t.get("status") != "complete"]
+        high_priority = [t for t in tasks if t.get("priority") == "High" and t.get("status") != "complete"]
 
         return {
             "total": len(tasks),
-            "pending": len(pending),
-            "in_progress": len(in_progress),
-            "completed": len(completed),
+            "active": len(active),
+            "complete": len(complete),
             "high_priority": len(high_priority),
         }
     except Exception as e:

@@ -130,7 +130,7 @@ def register(all_reading_tools: list[str], all_writing_tools: list[str]) -> Tool
             # Use Supabase for tasks/decisions if available
             if _use_supabase():
                 task_counts = get_task_count()
-                pending_count = task_counts["pending"] + task_counts["in_progress"]
+                pending_count = task_counts["active"]
                 high_priority_count = task_counts["high_priority"]
             else:
                 tasks_data = load_json("pending_tasks.json")

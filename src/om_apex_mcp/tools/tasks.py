@@ -1,8 +1,11 @@
-"""Task management tools: get, add, complete, update_status, update.
+"""Task management tools: get, add, complete, update_status, update, force_complete.
 
 NOTE: As of Feb 2026, all task operations use Supabase as the single source of truth.
 The JSON fallback has been removed. If Supabase is not available, operations will fail
 with a clear error message.
+
+Updated Mar 2026: 10-status lifecycle, source tracking, planning artifact paths,
+approval tracking, force_complete tool.
 """
 
 import json
@@ -22,8 +25,16 @@ from ..supabase_client import (
 )
 
 
+VALID_STATUSES = [
+    "created", "approved-for-prd", "prd-to-review", "ready-to-plan",
+    "planning-in-progress", "plan-to-review", "ready-to-code",
+    "coding-in-progress", "ready-for-manual-review", "complete",
+]
+
+VALID_SOURCES = ["nishad", "user-report", "claude-code", "sentry", "posthog"]
+
 READING = ["get_pending_tasks", "get_task_queue"]
-WRITING = ["add_task", "complete_task", "update_task_status", "update_task"]
+WRITING = ["add_task", "complete_task", "update_task_status", "update_task", "force_complete"]
 
 
 def _require_supabase() -> None:
@@ -46,24 +57,26 @@ def register() -> ToolModule:
                 "properties": {
                     "company": {"type": "string", "description": "Filter by company name (optional)"},
                     "category": {"type": "string", "description": "Filter by category (optional)"},
-                    "status": {"type": "string", "description": "Filter by status: pending, in_progress, completed (optional)"},
+                    "status": {"type": "string", "description": "Filter by status: created, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete (optional)"},
                     "owner": {"type": "string", "description": "Filter by owner name (e.g., Nishad, Sumedha, Both, Claude, Scroggin, etc.)"},
-                    "task_type": {"type": "string", "description": "Filter by task type: issue, dev, manual (optional)"},
+                    "task_type": {"type": "string", "description": "Filter by task type: issue, dev, manual, enhancement, feature-request (optional)"},
+                    "source": {"type": "string", "description": "Filter by source: nishad, user-report, claude-code, sentry, posthog (optional)"},
                 },
                 "required": [],
             },
         ),
         Tool(
             name="get_task_queue",
-            description="Get a compact task listing: id, truncated description (80 chars), priority, status, owner, company. Sorted by priority (High→Medium→Low) then age (oldest first). Default limit 10.",
+            description="Get a compact task listing: id, truncated description (80 chars), priority, status, owner, company. Sorted by priority (High\u2192Medium\u2192Low) then age (oldest first). Default limit 10.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "description": "Max tasks to return (default 10)"},
                     "owner": {"type": "string", "description": "Filter by owner name (optional)"},
                     "priority": {"type": "string", "description": "Filter by priority: High, Medium, Low (optional)"},
-                    "status": {"type": "string", "description": "Filter by status: pending, in_progress (optional, defaults to both)"},
+                    "status": {"type": "string", "description": "Filter by status: created, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete (optional, defaults to all non-complete)"},
                     "company": {"type": "string", "description": "Filter by company name (optional)"},
+                    "source": {"type": "string", "description": "Filter by source: nishad, user-report, claude-code, sentry, posthog (optional)"},
                 },
                 "required": [],
             },
@@ -79,7 +92,9 @@ def register() -> ToolModule:
                     "company": {"type": "string", "description": "Company: Om Apex Holdings, Om Luxe Properties, Om AI Solutions, Om Supply Chain"},
                     "priority": {"type": "string", "description": "Priority: High, Medium, Low"},
                     "notes": {"type": "string", "description": "Additional notes (optional)"},
-                    "task_type": {"type": "string", "description": "Task type: issue (from GitHub issue), dev (development work), manual (default). Default: manual", "enum": ["issue", "dev", "manual"]},
+                    "task_type": {"type": "string", "description": "Task type: issue, dev, manual, enhancement, feature-request (default: manual)", "enum": ["issue", "dev", "manual", "enhancement", "feature-request"]},
+                    "source": {"type": "string", "description": "Task source: nishad (default), user-report, claude-code, sentry, posthog"},
+                    "prd_path": {"type": "string", "description": "Relative path to PRD file, e.g. 'docs/plans/TASK-nnn/PRD-nnn.md' (optional)"},
                     "commit_refs": {"type": "array", "items": {"type": "string"}, "description": "Git commit SHAs associated with this task (optional)"},
                     "issue_ref": {"type": "string", "description": "GitHub issue reference, e.g. 'om-apex/repo#123' (optional)"},
                 },
@@ -88,7 +103,7 @@ def register() -> ToolModule:
         ),
         Tool(
             name="complete_task",
-            description="Mark a task as completed with optional completion notes",
+            description="Mark a task as completed with optional completion notes. Task must be at 'ready-for-manual-review' status. Use force_complete for manual override.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -105,14 +120,14 @@ def register() -> ToolModule:
                 "type": "object",
                 "properties": {
                     "task_id": {"type": "string", "description": "The task ID (e.g., TASK-001)"},
-                    "status": {"type": "string", "description": "New status: pending, in_progress, completed"},
+                    "status": {"type": "string", "description": "New status: created, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete"},
                 },
                 "required": ["task_id", "status"],
             },
         ),
         Tool(
             name="update_task",
-            description="Update any field of an existing task (description, notes, priority, category, company, owner)",
+            description="Update any field of an existing task (description, notes, priority, category, company, owner, prd_path, plan_folder, approved_by, approved_at)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -123,6 +138,22 @@ def register() -> ToolModule:
                     "category": {"type": "string", "description": "New category: Technical, Marketing, Legal, Operations, Administrative, Content (optional)"},
                     "company": {"type": "string", "description": "New company: Om Apex Holdings, Om Luxe Properties, Om AI Solutions, Om Supply Chain (optional)"},
                     "owner": {"type": "string", "description": "New owner name (optional)"},
+                    "prd_path": {"type": "string", "description": "Relative path to PRD file (optional)"},
+                    "plan_folder": {"type": "string", "description": "Relative path to plan folder (optional)"},
+                    "approved_by": {"type": "string", "description": "Name of approver (optional)"},
+                    "approved_at": {"type": "string", "description": "Approval timestamp in ISO format (optional)"},
+                },
+                "required": ["task_id"],
+            },
+        ),
+        Tool(
+            name="force_complete",
+            description="Force-complete any task regardless of current status. Bypasses prerequisite checks. For Owner Portal manual overrides only \u2014 Claude Code should use complete_task instead.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "The task ID (e.g., TASK-001)"},
+                    "notes": {"type": "string", "description": "Reason for force completion (optional)"},
                 },
                 "required": ["task_id"],
             },
@@ -138,6 +169,7 @@ def register() -> ToolModule:
                 status=arguments.get("status"),
                 owner=arguments.get("owner"),
                 task_type=arguments.get("task_type"),
+                source=arguments.get("source"),
             )
             return [TextContent(type="text", text=json.dumps(tasks, indent=2))]
 
@@ -149,6 +181,7 @@ def register() -> ToolModule:
                 priority=arguments.get("priority"),
                 status=arguments.get("status"),
                 company=arguments.get("company"),
+                source=arguments.get("source"),
             )
             if not tasks:
                 return [TextContent(type="text", text="Task Queue: No tasks found.")]
@@ -178,7 +211,7 @@ def register() -> ToolModule:
                 "category": arguments["category"],
                 "company": arguments["company"],
                 "priority": arguments["priority"],
-                "status": "pending",
+                "status": "created",
                 "created_at": datetime.now().isoformat(),
             }
             if owner:
@@ -187,6 +220,10 @@ def register() -> ToolModule:
                 new_task["notes"] = arguments["notes"]
             if arguments.get("task_type"):
                 new_task["task_type"] = arguments["task_type"]
+            if arguments.get("source"):
+                new_task["source"] = arguments["source"]
+            if arguments.get("prd_path"):
+                new_task["prd_path"] = arguments["prd_path"]
             if arguments.get("commit_refs"):
                 new_task["commit_refs"] = arguments["commit_refs"]
             if arguments.get("issue_ref"):
@@ -200,15 +237,22 @@ def register() -> ToolModule:
             task_id = arguments["task_id"]
             completion_notes = arguments.get("notes")
 
-            # First get the existing task to merge notes
+            # First get the existing task to check prerequisite and merge notes
             existing_tasks = sb_get_tasks()
             existing_task = next((t for t in existing_tasks if t.get("id") == task_id), None)
 
             if not existing_task:
                 return [TextContent(type="text", text=f"Task {task_id} not found")]
 
+            # Enforce prerequisite: must be at ready-for-manual-review
+            if existing_task.get("status") != "ready-for-manual-review":
+                return [TextContent(type="text", text=(
+                    f"Task {task_id} cannot be completed: status is '{existing_task.get('status')}', "
+                    f"must be 'ready-for-manual-review'. Use force_complete for manual override."
+                ))]
+
             updates = {
-                "status": "completed",
+                "status": "complete",
                 "completed_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat(),
             }
@@ -224,7 +268,7 @@ def register() -> ToolModule:
 
             result = sb_update_task(task_id, updates)
             if result:
-                return [TextContent(type="text", text=f"Task {task_id} marked as completed:\n{json.dumps(result, indent=2)}")]
+                return [TextContent(type="text", text=f"Task {task_id} marked as complete:\n{json.dumps(result, indent=2)}")]
             return [TextContent(type="text", text=f"Task {task_id} not found")]
 
         elif name == "update_task_status":
@@ -232,14 +276,17 @@ def register() -> ToolModule:
             task_id = arguments["task_id"]
             new_status = arguments["status"]
 
-            if new_status not in ["pending", "in_progress", "completed"]:
-                return [TextContent(type="text", text=f"Invalid status: {new_status}. Must be pending, in_progress, or completed")]
+            if new_status not in VALID_STATUSES:
+                return [TextContent(type="text", text=(
+                    f"Invalid status: {new_status}. "
+                    f"Must be one of: {', '.join(VALID_STATUSES)}"
+                ))]
 
             updates = {
                 "status": new_status,
                 "updated_at": datetime.now().isoformat(),
             }
-            if new_status == "completed":
+            if new_status == "complete":
                 updates["completed_at"] = datetime.now().isoformat()
 
             result = sb_update_task(task_id, updates)
@@ -274,6 +321,18 @@ def register() -> ToolModule:
             if arguments.get("owner"):
                 updates["owner"] = arguments["owner"]
                 updated_fields.append("owner")
+            if arguments.get("prd_path"):
+                updates["prd_path"] = arguments["prd_path"]
+                updated_fields.append("prd_path")
+            if arguments.get("plan_folder"):
+                updates["plan_folder"] = arguments["plan_folder"]
+                updated_fields.append("plan_folder")
+            if arguments.get("approved_by"):
+                updates["approved_by"] = arguments["approved_by"]
+                updated_fields.append("approved_by")
+            if arguments.get("approved_at"):
+                updates["approved_at"] = arguments["approved_at"]
+                updated_fields.append("approved_at")
 
             if not updates:
                 return [TextContent(type="text", text=f"No updates provided for task {task_id}")]
@@ -283,6 +342,38 @@ def register() -> ToolModule:
 
             if result:
                 return [TextContent(type="text", text=f"Task {task_id} updated successfully.\nUpdated fields: {', '.join(updated_fields)}\n\n{json.dumps(result, indent=2)}")]
+            return [TextContent(type="text", text=f"Task {task_id} not found")]
+
+        elif name == "force_complete":
+            _require_supabase()
+            task_id = arguments["task_id"]
+            force_notes = arguments.get("notes", "")
+
+            existing_tasks = sb_get_tasks()
+            existing_task = next((t for t in existing_tasks if t.get("id") == task_id), None)
+
+            if not existing_task:
+                return [TextContent(type="text", text=f"Task {task_id} not found")]
+
+            timestamp = datetime.now().isoformat()
+            override_note = f"[Force Complete at {timestamp}]"
+            if force_notes:
+                override_note += f" {force_notes}"
+
+            existing_notes = existing_task.get("notes", "") or ""
+            new_notes = f"{existing_notes}\n\n{override_note}".strip() if existing_notes else override_note
+
+            updates = {
+                "status": "complete",
+                "completed_at": timestamp,
+                "updated_at": timestamp,
+                "notes": new_notes,
+                "completion_notes": force_notes or "Force completed via Owner Portal",
+            }
+
+            result = sb_update_task(task_id, updates)
+            if result:
+                return [TextContent(type="text", text=f"Task {task_id} force-completed:\n{json.dumps(result, indent=2)}")]
             return [TextContent(type="text", text=f"Task {task_id} not found")]
 
         return None

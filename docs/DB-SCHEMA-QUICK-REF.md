@@ -1,6 +1,6 @@
 # Database Schema Quick Reference
 
-> Last updated: 2026-02-25
+> Last updated: 2026-03-05
 
 ## Owner Portal (hympgocuivzxzxllgmcy)
 
@@ -14,7 +14,7 @@ Central task tracker for all Om Apex companies.
 | category | TEXT | Technical, Marketing, Legal, Operations, Administrative, Content |
 | company | TEXT | Om Apex Holdings, Om Luxe Properties, Om AI Solutions, Om Supply Chain |
 | priority | TEXT | High, Medium, Low |
-| status | TEXT | pending, in_progress, completed |
+| status | TEXT | `created`, `approved-for-prd`, `prd-to-review`, `ready-to-plan`, `planning-in-progress`, `plan-to-review`, `ready-to-code`, `coding-in-progress`, `ready-for-manual-review`, `complete` |
 | owner | TEXT | Person name (Nishad, Sumedha, Claude, etc.) |
 | notes | TEXT | Additional notes |
 | project_code | TEXT | Optional project code |
@@ -24,9 +24,14 @@ Central task tracker for all Om Apex companies.
 | updated_at | TIMESTAMPTZ | Auto |
 | completed_at | TIMESTAMPTZ | Set on completion |
 | completion_notes | TEXT | What was done |
-| task_type | TEXT | `issue`, `dev`, `manual` (default: manual) |
+| task_type | TEXT | `issue`, `dev`, `manual`, `enhancement`, `feature-request` (default: manual) |
 | commit_refs | TEXT[] | Git commit SHAs associated with task |
 | issue_ref | TEXT | GitHub issue reference (e.g., `om-apex/repo#123`) |
+| source | TEXT | Task origin: `nishad`, `user-report`, `claude-code`, `sentry`, `posthog` (default: nishad) |
+| prd_path | TEXT | Relative path to PRD file, e.g. `docs/plans/TASK-nnn/PRD-nnn.md` |
+| plan_folder | TEXT | Relative path to plan folder, e.g. `docs/plans/TASK-nnn/` |
+| approved_by | TEXT | Name of approver at most recent approval gate |
+| approved_at | TIMESTAMPTZ | Timestamp of most recent approval gate passage |
 
 ### decisions
 Technology and business decisions with rationale.
