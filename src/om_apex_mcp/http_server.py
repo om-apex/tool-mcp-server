@@ -182,18 +182,15 @@ def create_app() -> Starlette:
 
         if path.startswith("/core"):
             scope = dict(scope, path=path[5:] or "/")
-            logger.info("mcp_router: → core")
             await managers["core"].handle_request(scope, receive, send)
         elif path.startswith("/dns"):
             scope = dict(scope, path=path[4:] or "/")
-            logger.info("mcp_router: → dns")
             await managers["dns"].handle_request(scope, receive, send)
         elif path.startswith("/docs"):
             scope = dict(scope, path=path[5:] or "/")
-            logger.info("mcp_router: → docs")
             await managers["docs"].handle_request(scope, receive, send)
         else:
-            logger.info("mcp_router: → all")
+            scope = dict(scope, path=path or "/")
             await managers["all"].handle_request(scope, receive, send)
 
     routes = [
