@@ -174,16 +174,21 @@ def create_app() -> Starlette:
     # overlapping-prefix issue where Mount("/mcp") catches /mcp/core.
     async def mcp_router(scope, receive, send):
         path = scope.get("path", "")
+        logger.info(f"mcp_router: path={path!r} type={scope.get('type')}")
         if path.startswith("/core"):
             scope = dict(scope, path=path[5:] or "/", root_path=scope.get("root_path", "") + "/core")
+            logger.info("mcp_router: dispatching to CORE manager")
             await managers["core"].handle_request(scope, receive, send)
         elif path.startswith("/dns"):
             scope = dict(scope, path=path[4:] or "/", root_path=scope.get("root_path", "") + "/dns")
+            logger.info("mcp_router: dispatching to DNS manager")
             await managers["dns"].handle_request(scope, receive, send)
         elif path.startswith("/docs"):
             scope = dict(scope, path=path[5:] or "/", root_path=scope.get("root_path", "") + "/docs")
+            logger.info("mcp_router: dispatching to DOCS manager")
             await managers["docs"].handle_request(scope, receive, send)
         else:
+            logger.info("mcp_router: dispatching to ALL manager")
             await managers["all"].handle_request(scope, receive, send)
 
     routes = [
