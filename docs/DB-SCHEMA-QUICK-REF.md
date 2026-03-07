@@ -497,6 +497,32 @@ Seeded with 9 rows: fred, bls, sec_edgar, census, world_bank, alpha_vantage, ope
 | data_sources_used | TEXT[] | Source codes that succeeded (GIN index, TASK-366) |
 | data_source_results | JSONB | Full dispatcher results (summaries, latency, errors, TASK-366) |
 
+### api_service_pricing (TASK-366 REQ-09)
+Per-query pricing for non-model API services. Parallel to `llm_master` for LLMs.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| source_code | TEXT PK | Matches adapter source_code (e.g., `web_search`, `fred`) |
+| service_name | TEXT | Display name |
+| cost_per_query_cents | NUMERIC(10,4) | Base cost per API call in cents |
+| margin_multiplier | NUMERIC(4,2) | Margin on base cost (default 2.0x) |
+| is_active | BOOLEAN | Whether cost tracking is active |
+| notes | TEXT | Pricing notes |
+
+### orch_turn_api_costs (TASK-366 REQ-09)
+Per-turn API cost log. One row per (turn, source_code). Pricing snapshotted at call time.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| turn_id | UUID FK | -> orch_turns (CASCADE) |
+| source_code | TEXT | API source identifier |
+| query_count | INTEGER | Number of API calls made |
+| cost_per_query_cents | NUMERIC(10,4) | Snapshot from api_service_pricing |
+| margin_multiplier | NUMERIC(4,2) | Snapshot from api_service_pricing |
+| base_cost_cents | INTEGER | Before margin |
+| total_cost_cents | INTEGER | After margin (charged to user) |
+
 ### RPC Functions (Stats — added 2026-02-28)
 
 **fn_user_usage_stats(p_user_id UUID, p_period TEXT)**
