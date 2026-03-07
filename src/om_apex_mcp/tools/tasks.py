@@ -4,8 +4,8 @@ NOTE: As of Feb 2026, all task operations use Supabase as the single source of t
 The JSON fallback has been removed. If Supabase is not available, operations will fail
 with a clear error message.
 
-Updated Mar 2026: 10-status lifecycle, source tracking, planning artifact paths,
-approval tracking, force_complete tool.
+Updated Mar 2026: 12-status lifecycle (added assigned-to-claude, notes-prd-unclear),
+source tracking, planning artifact paths, approval tracking, force_complete tool.
 """
 
 import json
@@ -26,7 +26,8 @@ from ..supabase_client import (
 
 
 VALID_STATUSES = [
-    "created", "approved-for-prd", "prd-to-review", "ready-to-plan",
+    "created", "assigned-to-claude", "notes-prd-unclear",
+    "approved-for-prd", "prd-to-review", "ready-to-plan",
     "planning-in-progress", "plan-to-review", "ready-to-code",
     "coding-in-progress", "ready-for-manual-review", "complete",
 ]
@@ -57,7 +58,7 @@ def register() -> ToolModule:
                 "properties": {
                     "company": {"type": "string", "description": "Filter by company name (optional)"},
                     "category": {"type": "string", "description": "Filter by category (optional)"},
-                    "status": {"type": "string", "description": "Filter by status: created, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete (optional)"},
+                    "status": {"type": "string", "description": "Filter by status: created, assigned-to-claude, notes-prd-unclear, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete (optional)"},
                     "owner": {"type": "string", "description": "Filter by owner name (e.g., Nishad, Sumedha, Both, Claude, Scroggin, etc.)"},
                     "task_type": {"type": "string", "description": "Filter by task type: issue, dev, manual, enhancement, feature-request (optional)"},
                     "source": {"type": "string", "description": "Filter by source: nishad, user-report, claude-code, sentry, posthog (optional)"},
@@ -74,7 +75,7 @@ def register() -> ToolModule:
                     "limit": {"type": "integer", "description": "Max tasks to return (default 10)"},
                     "owner": {"type": "string", "description": "Filter by owner name (optional)"},
                     "priority": {"type": "string", "description": "Filter by priority: High, Medium, Low (optional)"},
-                    "status": {"type": "string", "description": "Filter by status: created, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete (optional, defaults to all non-complete)"},
+                    "status": {"type": "string", "description": "Filter by status: created, assigned-to-claude, notes-prd-unclear, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete (optional, defaults to all non-complete)"},
                     "company": {"type": "string", "description": "Filter by company name (optional)"},
                     "source": {"type": "string", "description": "Filter by source: nishad, user-report, claude-code, sentry, posthog (optional)"},
                 },
@@ -120,7 +121,7 @@ def register() -> ToolModule:
                 "type": "object",
                 "properties": {
                     "task_id": {"type": "string", "description": "The task ID (e.g., TASK-001)"},
-                    "status": {"type": "string", "description": "New status: created, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete"},
+                    "status": {"type": "string", "description": "New status: created, assigned-to-claude, notes-prd-unclear, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete"},
                 },
                 "required": ["task_id", "status"],
             },

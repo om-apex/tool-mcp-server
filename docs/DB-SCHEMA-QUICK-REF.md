@@ -14,7 +14,7 @@ Central task tracker for all Om Apex companies.
 | category | TEXT | Technical, Marketing, Legal, Operations, Administrative, Content |
 | company | TEXT | Om Apex Holdings, Om Luxe Properties, Om AI Solutions, Om Supply Chain |
 | priority | TEXT | High, Medium, Low |
-| status | TEXT | `created`, `approved-for-prd`, `prd-to-review`, `ready-to-plan`, `planning-in-progress`, `plan-to-review`, `ready-to-code`, `coding-in-progress`, `ready-for-manual-review`, `complete` |
+| status | TEXT | `created`, `assigned-to-claude`, `notes-prd-unclear`, `approved-for-prd`, `prd-to-review`, `ready-to-plan`, `planning-in-progress`, `plan-to-review`, `ready-to-code`, `coding-in-progress`, `ready-for-manual-review`, `complete` |
 | owner | TEXT | Person name (Nishad, Sumedha, Claude, etc.) |
 | notes | TEXT | Additional notes |
 | project_code | TEXT | Optional project code |
