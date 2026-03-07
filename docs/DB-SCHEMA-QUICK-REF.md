@@ -460,6 +460,30 @@ Audit trail for prompt template changes. Stores previous version before each UPD
 | change_reason | TEXT | Why the change was made |
 | created_at | TIMESTAMPTZ | Auto |
 
+### orch_data_sources (added 2026-03-07)
+Master registry of external data APIs for real-time data augmentation. Not config-versioned.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| source_code | VARCHAR(30) UNIQUE | Slug for S0 routing (e.g., `fred`, `bls`) |
+| name | VARCHAR(100) | Human-readable name |
+| description | TEXT | Source description |
+| domain | VARCHAR(50) | Knowledge domain |
+| classification_guidance | TEXT | Injected into S0 prompt |
+| auth_type | VARCHAR(20) | `none`, `api_key`, `oauth` |
+| api_key_env_var | VARCHAR(50) | Env var name for API key |
+| base_url | TEXT | Canonical API base URL |
+| rate_limit_per_day | INTEGER | Documented limit (informational) |
+| tier | INTEGER | 1-3 (primary/secondary/tertiary) |
+| priority | INTEGER | Lower = higher priority |
+| adapter_class | VARCHAR(100) | Python class name |
+| is_active | BOOLEAN | Active flag |
+| created_at | TIMESTAMPTZ | Auto |
+| updated_at | TIMESTAMPTZ | Auto (trigger) |
+
+Seeded with 9 rows: fred, bls, sec_edgar, census, world_bank, alpha_vantage, openalex, wikipedia, web_search.
+
 ### orch_stages — new columns (2026-02-28)
 | Column | Type | Notes |
 |--------|------|-------|
@@ -469,6 +493,9 @@ Audit trail for prompt template changes. Stores previous version before each UPD
 | Column | Type | Notes |
 |--------|------|-------|
 | user_rating_value | INTEGER | Value-for-credits rating (1-5), CHECK constraint |
+| data_sources_requested | TEXT[] | Source codes requested by S0 (GIN index, TASK-366) |
+| data_sources_used | TEXT[] | Source codes that succeeded (GIN index, TASK-366) |
+| data_source_results | JSONB | Full dispatcher results (summaries, latency, errors, TASK-366) |
 
 ### RPC Functions (Stats — added 2026-02-28)
 
