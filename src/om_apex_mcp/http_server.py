@@ -169,14 +169,26 @@ def create_app() -> Starlette:
             "checks": checks,
         })
 
+    # Custom ASGI sub-router: a single Mount at /mcp dispatches to the
+    # correct session manager based on the sub-path.  Avoids Starlette's
+    # overlapping-prefix issue where Mount("/mcp") catches /mcp/core.
+    async def mcp_router(scope, receive, send):
+        path = scope.get("path", "")
+        if path.startswith("/core"):
+            scope = dict(scope, path=path[5:] or "/", root_path=scope.get("root_path", "") + "/core")
+            await managers["core"].handle_request(scope, receive, send)
+        elif path.startswith("/dns"):
+            scope = dict(scope, path=path[4:] or "/", root_path=scope.get("root_path", "") + "/dns")
+            await managers["dns"].handle_request(scope, receive, send)
+        elif path.startswith("/docs"):
+            scope = dict(scope, path=path[5:] or "/", root_path=scope.get("root_path", "") + "/docs")
+            await managers["docs"].handle_request(scope, receive, send)
+        else:
+            await managers["all"].handle_request(scope, receive, send)
+
     routes = [
         Route("/health", health, methods=["GET"]),
-        # Specific groups first (Starlette matches in order; longer prefix wins)
-        Mount("/mcp/core", app=managers["core"].handle_request),
-        Mount("/mcp/dns", app=managers["dns"].handle_request),
-        Mount("/mcp/docs", app=managers["docs"].handle_request),
-        # Default: all tools (backward compatible for Claude Desktop / existing clients)
-        Mount("/mcp", app=managers["all"].handle_request),
+        Mount("/mcp", app=mcp_router),
     ]
 
     middleware = [
