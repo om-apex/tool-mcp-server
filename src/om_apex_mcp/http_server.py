@@ -10,7 +10,7 @@ Author: Nishad Tambe
 import logging
 import os
 import time
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -24,7 +24,7 @@ from starlette.routing import Mount, Route
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 from .auth import AuthMiddleware
-from .server import create_server
+from .server import SERVER_GROUPS, create_server
 from .storage import GoogleDriveStorage, LocalStorage
 
 logging.basicConfig(level=logging.INFO)
@@ -106,16 +106,29 @@ def _check_storage_health() -> dict:
 
 
 def create_app() -> Starlette:
-    """Create the Starlette ASGI application."""
+    """Create the Starlette ASGI application.
+
+    Creates separate MCP server instances per tool group:
+      /mcp       — all tools (backward compatible)
+      /mcp/core  — core tools only (tasks, progress, calendar, handoff, quorum, incidents, context)
+      /mcp/dns   — DNS Sentinel tools only
+      /mcp/docs  — document generation tools only
+    """
     backend = _create_storage_backend()
-    server = create_server(backend)
-    session_manager = StreamableHTTPSessionManager(app=server, stateless=True)
+
+    # Create a server + session manager for each group
+    managers: dict[str, StreamableHTTPSessionManager] = {}
+    for group_name in [None, "core", "dns", "docs"]:
+        srv = create_server(backend, group=group_name)
+        managers[group_name or "all"] = StreamableHTTPSessionManager(app=srv, stateless=True)
 
     @asynccontextmanager
     async def lifespan(app):
-        """Application lifespan — startup/shutdown."""
+        """Application lifespan — startup/shutdown for all managers."""
         logger.info("Om Apex MCP HTTP Server starting...")
-        async with session_manager.run():
+        async with AsyncExitStack() as stack:
+            for mgr in managers.values():
+                await stack.enter_async_context(mgr.run())
             yield
         logger.info("Om Apex MCP HTTP Server shut down.")
 
@@ -158,7 +171,12 @@ def create_app() -> Starlette:
 
     routes = [
         Route("/health", health, methods=["GET"]),
-        Mount("/mcp", app=session_manager.handle_request),
+        # Specific groups first (Starlette matches in order; longer prefix wins)
+        Mount("/mcp/core", app=managers["core"].handle_request),
+        Mount("/mcp/dns", app=managers["dns"].handle_request),
+        Mount("/mcp/docs", app=managers["docs"].handle_request),
+        # Default: all tools (backward compatible for Claude Desktop / existing clients)
+        Mount("/mcp", app=managers["all"].handle_request),
     ]
 
     middleware = [

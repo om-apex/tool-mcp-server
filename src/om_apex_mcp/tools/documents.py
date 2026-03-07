@@ -803,7 +803,7 @@ def register() -> ToolModule:
     tools = [
         Tool(
             name="generate_branded_html",
-            description="Convert markdown to branded HTML with Om Apex header/footer, cover page, auto-bookmarks, and linked TOC. Output is HTML for browser Print-to-PDF.",
+            description="Convert markdown to branded HTML with header/footer, cover page, and linked TOC for Print-to-PDF.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -817,12 +817,7 @@ def register() -> ToolModule:
         ),
         Tool(
             name="generate_company_document",
-            description=(
-                "Generate a branded HTML document from a template for a specific company. "
-                "Templates live in document-templates/ on the shared drive. "
-                "All {{variables}} in the template are resolved from the company's config. "
-                "Example: generate_company_document(template='Operating-Agreement-Template', company='Om Luxe Properties')"
-            ),
+            description="Generate branded HTML from a template for a company. Resolves {{variables}} from company-config.json.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -844,7 +839,7 @@ def register() -> ToolModule:
         ),
         Tool(
             name="view_document_template",
-            description="View the contents of a document template, showing all {{variables}} and their placement. Example: view_document_template(template='Operating-Agreement-Template')",
+            description="View a document template's content and {{variable}} placeholders.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -858,12 +853,12 @@ def register() -> ToolModule:
         ),
         Tool(
             name="list_document_templates",
-            description="List available document templates from the document-templates/ folder on the shared drive.",
+            description="List available document templates.",
             inputSchema={"type": "object", "properties": {}, "required": []},
         ),
         Tool(
             name="get_brand_assets",
-            description="Get the full brand assets for a company: colors, fonts, logo path, legal info, contact info. Example: get_brand_assets(company='Om Luxe Properties')",
+            description="Get brand assets for a company: colors, fonts, logo, legal, and contact info.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -877,21 +872,17 @@ def register() -> ToolModule:
         ),
         Tool(
             name="list_company_configs",
-            description="List available company-config.json files with branding and legal info summary for document generation.",
+            description="List company configs with branding and legal info summary.",
             inputSchema={"type": "object", "properties": {}, "required": []},
         ),
         Tool(
             name="sync_templates_to_supabase",
-            description="Sync document templates and company configs from local Google Drive to Supabase for remote access. Only works when local storage is available.",
+            description="Sync templates and company configs from local Google Drive to Supabase.",
             inputSchema={"type": "object", "properties": {}, "required": []},
         ),
         Tool(
             name="create_document_template",
-            description=(
-                "Create a new document template in Supabase. Templates use {{variable}} placeholders "
-                "that are resolved from company-config.json when generating documents. "
-                "Example: create_document_template(name='NDA-Template', content='# Non-Disclosure Agreement\\n\\nThis NDA is between {{company_name}} and...')"
-            ),
+            description="Create a new document template in Supabase with {{variable}} placeholders.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -913,11 +904,7 @@ def register() -> ToolModule:
         ),
         Tool(
             name="update_document_template",
-            description=(
-                "Update an existing document template in Supabase. You can update the content, name, or description. "
-                "Use view_document_template first to see the current content. "
-                "Example: update_document_template(template_id='nda-template', content='# Updated NDA\\n\\n...')"
-            ),
+            description="Update an existing document template in Supabase (content, name, or description).",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -943,11 +930,7 @@ def register() -> ToolModule:
         ),
         Tool(
             name="delete_document_template",
-            description=(
-                "Delete a document template from Supabase. This action is permanent. "
-                "Use list_document_templates to see available templates and their IDs. "
-                "Example: delete_document_template(template_id='old-template')"
-            ),
+            description="Permanently delete a document template from Supabase.",
             inputSchema={
                 "type": "object",
                 "properties": {

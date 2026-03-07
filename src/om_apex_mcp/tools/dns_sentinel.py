@@ -84,11 +84,7 @@ def register() -> ToolModule:
     tools = [
         Tool(
             name="dns_snapshot",
-            description=(
-                "Pull current DNS records from Cloudflare for all domains (or a specific domain) "
-                "and save them to dns_snapshots table. Use this to take an initial or periodic "
-                "snapshot of the live DNS state. Also updates cloudflare_zone_id in dns_domain_config."
-            ),
+            description="Snapshot live Cloudflare DNS records to dns_snapshots table. Optionally target a single domain.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -102,11 +98,7 @@ def register() -> ToolModule:
         ),
         Tool(
             name="dns_audit",
-            description=(
-                "Audit DNS records for all domains (or a specific domain / tier) against "
-                "source-of-truth policies. Returns findings with severity (critical/warning/info). "
-                "Set fix_safe=true to auto-heal safe findings immediately."
-            ),
+            description="Audit DNS records against source-of-truth policies. Returns findings by severity. Set fix_safe=true to auto-heal.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -128,10 +120,7 @@ def register() -> ToolModule:
         ),
         Tool(
             name="dns_view_config",
-            description=(
-                "View the source-of-truth DNS configuration: domain configs with tier/services/expected records, "
-                "or details for a specific domain or service definition."
-            ),
+            description="View DNS source-of-truth config: domain tiers, services, expected records. Filter by domain or service.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -149,10 +138,7 @@ def register() -> ToolModule:
         ),
         Tool(
             name="dns_view_approvals",
-            description=(
-                "View DNS changes that are pending human approval. "
-                "These are dangerous changes (A/MX/CNAME edits, deletes) queued by the audit engine."
-            ),
+            description="View DNS changes pending human approval (dangerous changes queued by audit).",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -202,12 +188,7 @@ def register() -> ToolModule:
         ),
         Tool(
             name="dns_heal",
-            description=(
-                "Apply auto-healable DNS fixes across all domains (or a specific domain). "
-                "Safe changes (add missing DMARC/SPF/CAA) are applied immediately. "
-                "Dangerous changes are queued for approval. "
-                "Use dry_run=true (default) to preview what would change without applying anything."
-            ),
+            description="Apply auto-healable DNS fixes. Safe changes applied immediately; dangerous queued for approval. Default dry_run=true.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -261,10 +242,7 @@ def register() -> ToolModule:
         ),
         Tool(
             name="dns_update_config",
-            description=(
-                "Update the source-of-truth configuration for a domain: "
-                "add/remove service assignments, add custom records, or update notes."
-            ),
+            description="Update DNS source-of-truth config for a domain: add/remove services, add records, update notes.",
             inputSchema={
                 "type": "object",
                 "properties": {

@@ -49,19 +49,32 @@ except ImportError as e:
     sys.exit(1)
 
 
-def create_server(backend: Optional[StorageBackend] = None) -> Server:
+# Module group definitions for selective loading
+_CORE_MODULES = frozenset({"tasks", "progress", "calendar", "handoff", "ai_quorum", "incidents", "context"})
+_DNS_MODULES = frozenset({"dns_sentinel"})
+_DOCS_MODULES = frozenset({"documents"})
+_ALL_MODULES = _CORE_MODULES | _DNS_MODULES | _DOCS_MODULES
+
+SERVER_GROUPS = {
+    "core": _CORE_MODULES,
+    "dns": _DNS_MODULES,
+    "docs": _DOCS_MODULES,
+    None: _ALL_MODULES,
+}
+
+
+def create_server(backend: Optional[StorageBackend] = None, group: Optional[str] = None) -> Server:
     """Create and configure the MCP server with given storage backend.
 
     Args:
         backend: Storage backend to use. Defaults to LocalStorage if None.
+        group: Tool group to load: "core", "dns", "docs", or None for all.
 
     Returns:
         Configured MCP Server instance.
-
-    Raises:
-        RuntimeError: If critical initialization fails.
     """
-    logger.info("Creating MCP server...")
+    allowed = SERVER_GROUPS.get(group, _ALL_MODULES)
+    logger.info(f"Creating MCP server (group={group or 'all'}, {len(allowed)} module types)...")
 
     # Phase 1: Initialize storage backend
     try:
@@ -84,125 +97,101 @@ def create_server(backend: Optional[StorageBackend] = None) -> Server:
         logger.critical(f"Failed to create Server instance: {e}")
         raise RuntimeError(f"Cannot create MCP Server: {e}") from e
 
-    # Phase 3: Register tool modules with individual error handling
+    # Phase 3: Register tool modules (filtered by group)
     modules: list[ToolModule] = []
+    _task_mod = _progress_mod = _documents_mod = _calendar_mod = None
+    _handoff_mod = _quorum_mod = _incidents_mod = _dns_sentinel_mod = None
 
-    # Tasks module
-    try:
-        _task_mod = tasks.register()
-        modules.append(_task_mod)
-        logger.info(f"Tasks module loaded ({len(_task_mod.tools)} tools)")
-    except Exception as e:
-        logger.error(f"Failed to load tasks module: {e}")
-        logger.error(f"Traceback:\n{traceback.format_exc()}")
-        _task_mod = None
+    if "tasks" in allowed:
+        try:
+            _task_mod = tasks.register()
+            modules.append(_task_mod)
+            logger.info(f"Tasks module loaded ({len(_task_mod.tools)} tools)")
+        except Exception as e:
+            logger.error(f"Failed to load tasks module: {e}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-    # Progress module
-    try:
-        _progress_mod = progress.register()
-        modules.append(_progress_mod)
-        logger.info(f"Progress module loaded ({len(_progress_mod.tools)} tools)")
-    except Exception as e:
-        logger.error(f"Failed to load progress module: {e}")
-        logger.error(f"Traceback:\n{traceback.format_exc()}")
-        _progress_mod = None
+    if "progress" in allowed:
+        try:
+            _progress_mod = progress.register()
+            modules.append(_progress_mod)
+            logger.info(f"Progress module loaded ({len(_progress_mod.tools)} tools)")
+        except Exception as e:
+            logger.error(f"Failed to load progress module: {e}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-    # Documents module
-    try:
-        _documents_mod = documents.register()
-        modules.append(_documents_mod)
-        logger.info(f"Documents module loaded ({len(_documents_mod.tools)} tools)")
-    except Exception as e:
-        logger.error(f"Failed to load documents module: {e}")
-        logger.error(f"Traceback:\n{traceback.format_exc()}")
-        _documents_mod = None
+    if "documents" in allowed:
+        try:
+            _documents_mod = documents.register()
+            modules.append(_documents_mod)
+            logger.info(f"Documents module loaded ({len(_documents_mod.tools)} tools)")
+        except Exception as e:
+            logger.error(f"Failed to load documents module: {e}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-    # Calendar module
-    try:
-        _calendar_mod = calendar.register()
-        modules.append(_calendar_mod)
-        logger.info(f"Calendar module loaded ({len(_calendar_mod.tools)} tools)")
-    except Exception as e:
-        logger.error(f"Failed to load calendar module: {e}")
-        logger.error(f"Traceback:\n{traceback.format_exc()}")
-        _calendar_mod = None
+    if "calendar" in allowed:
+        try:
+            _calendar_mod = calendar.register()
+            modules.append(_calendar_mod)
+            logger.info(f"Calendar module loaded ({len(_calendar_mod.tools)} tools)")
+        except Exception as e:
+            logger.error(f"Failed to load calendar module: {e}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-    # Handoff module
-    try:
-        _handoff_mod = handoff.register()
-        modules.append(_handoff_mod)
-        logger.info(f"Handoff module loaded ({len(_handoff_mod.tools)} tools)")
-    except Exception as e:
-        logger.error(f"Failed to load handoff module: {e}")
-        logger.error(f"Traceback:\n{traceback.format_exc()}")
-        _handoff_mod = None
+    if "handoff" in allowed:
+        try:
+            _handoff_mod = handoff.register()
+            modules.append(_handoff_mod)
+            logger.info(f"Handoff module loaded ({len(_handoff_mod.tools)} tools)")
+        except Exception as e:
+            logger.error(f"Failed to load handoff module: {e}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-    # AI Quorum module
-    try:
-        _quorum_mod = ai_quorum.register()
-        modules.append(_quorum_mod)
-        logger.info(f"AI Quorum module loaded ({len(_quorum_mod.tools)} tools)")
-    except Exception as e:
-        logger.error(f"Failed to load AI Quorum module: {e}")
-        logger.error(f"Traceback:\n{traceback.format_exc()}")
-        _quorum_mod = None
+    if "ai_quorum" in allowed:
+        try:
+            _quorum_mod = ai_quorum.register()
+            modules.append(_quorum_mod)
+            logger.info(f"AI Quorum module loaded ({len(_quorum_mod.tools)} tools)")
+        except Exception as e:
+            logger.error(f"Failed to load AI Quorum module: {e}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-    # Incidents module (Om Cortex prodsupport_incidents)
-    try:
-        _incidents_mod = incidents.register()
-        modules.append(_incidents_mod)
-        logger.info(f"Incidents module loaded ({len(_incidents_mod.tools)} tools)")
-    except Exception as e:
-        logger.error(f"Failed to load incidents module: {e}")
-        logger.error(f"Traceback:\n{traceback.format_exc()}")
-        _incidents_mod = None
+    if "incidents" in allowed:
+        try:
+            _incidents_mod = incidents.register()
+            modules.append(_incidents_mod)
+            logger.info(f"Incidents module loaded ({len(_incidents_mod.tools)} tools)")
+        except Exception as e:
+            logger.error(f"Failed to load incidents module: {e}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-    # DNS Sentinel module (Cloudflare DNS audit + auto-heal)
-    try:
-        _dns_sentinel_mod = dns_sentinel.register()
-        modules.append(_dns_sentinel_mod)
-        logger.info(f"DNS Sentinel module loaded ({len(_dns_sentinel_mod.tools)} tools)")
-    except Exception as e:
-        logger.error(f"Failed to load DNS Sentinel module: {e}")
-        logger.error(f"Traceback:\n{traceback.format_exc()}")
-        _dns_sentinel_mod = None
+    if "dns_sentinel" in allowed:
+        try:
+            _dns_sentinel_mod = dns_sentinel.register()
+            modules.append(_dns_sentinel_mod)
+            logger.info(f"DNS Sentinel module loaded ({len(_dns_sentinel_mod.tools)} tools)")
+        except Exception as e:
+            logger.error(f"Failed to load DNS Sentinel module: {e}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-    # Phase 4: Build tool lists and register context module
-    try:
-        _all_reading = context.READING.copy()
-        _all_writing = context.WRITING.copy()
+    # Phase 4: Build tool lists and register context module (core + all groups only)
+    if "context" in allowed:
+        try:
+            _all_reading = context.READING.copy()
+            _all_writing = context.WRITING.copy()
 
-        if _task_mod:
-            _all_reading += _task_mod.reading_tools
-            _all_writing += _task_mod.writing_tools
-        if _progress_mod:
-            _all_reading += _progress_mod.reading_tools
-            _all_writing += _progress_mod.writing_tools
-        if _documents_mod:
-            _all_reading += _documents_mod.reading_tools
-            _all_writing += _documents_mod.writing_tools
-        if _calendar_mod:
-            _all_reading += _calendar_mod.reading_tools
-            _all_writing += _calendar_mod.writing_tools
-        if _handoff_mod:
-            _all_reading += _handoff_mod.reading_tools
-            _all_writing += _handoff_mod.writing_tools
-        if _quorum_mod:
-            _all_reading += _quorum_mod.reading_tools
-            _all_writing += _quorum_mod.writing_tools
-        if _incidents_mod:
-            _all_reading += _incidents_mod.reading_tools
-            _all_writing += _incidents_mod.writing_tools
-        if _dns_sentinel_mod:
-            _all_reading += _dns_sentinel_mod.reading_tools
-            _all_writing += _dns_sentinel_mod.writing_tools
+            for mod in [_task_mod, _progress_mod, _documents_mod, _calendar_mod,
+                        _handoff_mod, _quorum_mod, _incidents_mod, _dns_sentinel_mod]:
+                if mod:
+                    _all_reading += mod.reading_tools
+                    _all_writing += mod.writing_tools
 
-        _context_mod = context.register(_all_reading, _all_writing)
-        modules.insert(0, _context_mod)  # Context module first
-        logger.info(f"Context module loaded ({len(_context_mod.tools)} tools)")
-    except Exception as e:
-        logger.error(f"Failed to load context module: {e}")
-        logger.error(f"Traceback:\n{traceback.format_exc()}")
+            _context_mod = context.register(_all_reading, _all_writing)
+            modules.insert(0, _context_mod)  # Context module first
+            logger.info(f"Context module loaded ({len(_context_mod.tools)} tools)")
+        except Exception as e:
+            logger.error(f"Failed to load context module: {e}")
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
 
     total_tools = sum(len(m.tools) for m in modules)
     logger.info(f"Total modules loaded: {len(modules)}, Total tools: {total_tools}")
