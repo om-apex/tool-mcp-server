@@ -124,6 +124,7 @@ def register() -> ToolModule:
                 "properties": {
                     "model": {"type": "string", "description": "Filter by model name (optional)"},
                     "category": {"type": "string", "description": "Filter by category (optional)"},
+                    "limit": {"type": "integer", "description": "Max results (default 50)"},
                 },
                 "required": [],
             },
@@ -266,7 +267,7 @@ def _handle_get_status():
 def _handle_list_sessions(arguments: dict):
     _require_quorum()
     client = get_quorum_client()
-    limit = arguments.get("limit", 20)
+    limit = min(arguments.get("limit", 20), 50)
 
     query = client.table("orch_sessions").select("*")
 
@@ -417,7 +418,7 @@ def _handle_turn_trace(arguments: dict):
 def _handle_get_logs(arguments: dict):
     _require_quorum()
     client = get_quorum_client()
-    limit = arguments.get("limit", 50)
+    limit = min(arguments.get("limit", 50), 200)
 
     query = client.table("orch_log").select("*")
 
@@ -435,6 +436,7 @@ def _handle_get_logs(arguments: dict):
 def _handle_model_performance(arguments: dict):
     _require_quorum()
     client = get_quorum_client()
+    limit = min(arguments.get("limit", 50), 100)
 
     # Try materialized view first
     data = None
@@ -444,7 +446,7 @@ def _handle_model_performance(arguments: dict):
             query = query.eq("model", arguments["model"])
         if arguments.get("category"):
             query = query.eq("category", arguments["category"])
-        resp = query.execute()
+        resp = query.limit(limit).execute()
         if resp.data:
             data = resp.data
     except Exception as view_err:
@@ -458,7 +460,7 @@ def _handle_model_performance(arguments: dict):
                 query = query.eq("model", arguments["model"])
             if arguments.get("category"):
                 query = query.eq("category", arguments["category"])
-            resp = query.limit(100).execute()
+            resp = query.limit(limit).execute()
             data = resp.data or []
             if data:
                 data = {"source": "run_metrics", "note": "v_model_performance view unavailable or empty", "rows": data}

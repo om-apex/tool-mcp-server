@@ -18,6 +18,7 @@ from . import ToolModule
 from ..supabase_client import (
     is_supabase_available,
     get_tasks as sb_get_tasks,
+    get_task_by_id as sb_get_task_by_id,
     get_task_queue as sb_get_task_queue,
     add_task as sb_add_task,
     update_task as sb_update_task,
@@ -52,16 +53,19 @@ def register() -> ToolModule:
     tools = [
         Tool(
             name="get_pending_tasks",
-            description="Get all pending tasks across Om Apex Holdings companies",
+            description="Get tasks with filters. At least one filter is required. Excludes complete tasks by default. Default limit 10, max 50.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "company": {"type": "string", "description": "Filter by company name (optional)"},
                     "category": {"type": "string", "description": "Filter by category (optional)"},
-                    "status": {"type": "string", "description": "Filter by status: created, assigned-to-claude, notes-prd-unclear, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete (optional)"},
+                    "status": {"type": "string", "description": "Filter by status: created, assigned-to-claude, notes-prd-unclear, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete (optional, defaults to all non-complete)"},
                     "owner": {"type": "string", "description": "Filter by owner name (e.g., Nishad, Sumedha, Both, Claude, Scroggin, etc.)"},
                     "task_type": {"type": "string", "description": "Filter by task type: issue, dev, manual, enhancement, feature-request (optional)"},
                     "source": {"type": "string", "description": "Filter by source: nishad, user-report, claude-code, sentry, posthog (optional)"},
+                    "search": {"type": "string", "description": "Text search across description and notes fields (optional)"},
+                    "task_id": {"type": "string", "description": "Fetch a single task by exact ID, e.g. TASK-382 (bypasses other filters)"},
+                    "limit": {"type": "integer", "description": "Max results to return (default 10, max 50)"},
                 },
                 "required": [],
             },
@@ -164,6 +168,16 @@ def register() -> ToolModule:
     async def handler(name: str, arguments: dict):
         if name == "get_pending_tasks":
             _require_supabase()
+
+            # Enforce at least one filter
+            filter_keys = ["company", "category", "status", "owner", "task_type", "source", "search", "task_id"]
+            has_filter = any(arguments.get(k) for k in filter_keys)
+            if not has_filter:
+                return [TextContent(type="text", text=(
+                    "Error: get_pending_tasks requires at least one filter. "
+                    "Provide one or more of: status, company, owner, category, task_type, source, search, or task_id."
+                ))]
+
             tasks = sb_get_tasks(
                 company=arguments.get("company"),
                 category=arguments.get("category"),
@@ -171,6 +185,9 @@ def register() -> ToolModule:
                 owner=arguments.get("owner"),
                 task_type=arguments.get("task_type"),
                 source=arguments.get("source"),
+                limit=arguments.get("limit", 10),
+                search=arguments.get("search"),
+                task_id=arguments.get("task_id"),
             )
             return [TextContent(type="text", text=json.dumps(tasks, indent=2))]
 
@@ -238,9 +255,8 @@ def register() -> ToolModule:
             task_id = arguments["task_id"]
             completion_notes = arguments.get("notes")
 
-            # First get the existing task to check prerequisite and merge notes
-            existing_tasks = sb_get_tasks()
-            existing_task = next((t for t in existing_tasks if t.get("id") == task_id), None)
+            # Get the existing task to check prerequisite and merge notes
+            existing_task = sb_get_task_by_id(task_id)
 
             if not existing_task:
                 return [TextContent(type="text", text=f"Task {task_id} not found")]
@@ -350,8 +366,7 @@ def register() -> ToolModule:
             task_id = arguments["task_id"]
             force_notes = arguments.get("notes", "")
 
-            existing_tasks = sb_get_tasks()
-            existing_task = next((t for t in existing_tasks if t.get("id") == task_id), None)
+            existing_task = sb_get_task_by_id(task_id)
 
             if not existing_task:
                 return [TextContent(type="text", text=f"Task {task_id} not found")]

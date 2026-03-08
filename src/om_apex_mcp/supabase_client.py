@@ -156,6 +156,28 @@ def is_supabase_available() -> bool:
 # Task Operations
 # =============================================================================
 
+def get_task_by_id(task_id: str) -> Optional[dict]:
+    """Get a single task by ID.
+
+    Args:
+        task_id: The task ID (e.g., TASK-001)
+
+    Returns:
+        Task dictionary or None if not found.
+    """
+    try:
+        client = get_supabase_client()
+        if not client:
+            logger.debug("get_task_by_id: Supabase not available")
+            return None
+
+        response = client.table("tasks").select("*").eq("id", task_id).limit(1).execute()
+        return response.data[0] if response.data else None
+    except Exception as e:
+        logger.error(f"Error fetching task {task_id}: {e}")
+        return None
+
+
 def get_tasks(
     company: Optional[str] = None,
     category: Optional[str] = None,
@@ -163,8 +185,16 @@ def get_tasks(
     owner: Optional[str] = None,
     task_type: Optional[str] = None,
     source: Optional[str] = None,
+    limit: int = 10,
+    search: Optional[str] = None,
+    task_id: Optional[str] = None,
 ) -> list[dict]:
     """Get tasks from Supabase with optional filters.
+
+    Args:
+        limit: Max results to return (default 10, max 50).
+        search: Text search across description and notes fields.
+        task_id: Fetch a single task by exact ID (bypasses other filters).
 
     Returns:
         List of task dictionaries. Empty list on error.
@@ -175,6 +205,11 @@ def get_tasks(
             logger.debug("get_tasks: Supabase not available")
             return []
 
+        # task_id: direct lookup, bypass all other filters
+        if task_id:
+            task = get_task_by_id(task_id)
+            return [task] if task else []
+
         query = client.table("tasks").select("*")
 
         if company:
@@ -183,14 +218,22 @@ def get_tasks(
             query = query.ilike("category", category)
         if status:
             query = query.ilike("status", status)
+        else:
+            # Default: exclude complete tasks
+            query = query.neq("status", "complete")
         if owner:
             query = query.ilike("owner", owner)
         if task_type:
             query = query.eq("task_type", task_type)
         if source:
             query = query.ilike("source", source)
+        if search:
+            query = query.or_(f"description.ilike.%{search}%,notes.ilike.%{search}%")
 
-        response = query.order("created_at", desc=True).execute()
+        # Cap limit
+        limit = min(limit, 50)
+
+        response = query.order("created_at", desc=True).limit(limit).execute()
         return response.data or []
     except Exception as e:
         logger.error(f"Error fetching tasks: {e}")
@@ -380,6 +423,7 @@ def get_task_queue(
 def get_decisions(
     area: Optional[str] = None,
     company: Optional[str] = None,
+    limit: int = 10,
 ) -> list[dict]:
     """Get decisions from Supabase with optional filters.
 
@@ -399,7 +443,10 @@ def get_decisions(
         if company:
             query = query.ilike("company", company)
 
-        response = query.order("date_decided", desc=True).execute()
+        # Cap limit
+        limit = min(limit, 50)
+
+        response = query.order("date_decided", desc=True).limit(limit).execute()
         return response.data or []
     except Exception as e:
         logger.error(f"Error fetching decisions: {e}")

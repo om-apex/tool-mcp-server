@@ -86,12 +86,13 @@ def register(all_reading_tools: list[str], all_writing_tools: list[str]) -> Tool
         ),
         Tool(
             name="get_decisions_history",
-            description="Get all recorded decisions with their rationale, optionally filtered by area or company",
+            description="Get recorded decisions with their rationale, optionally filtered by area or company. Default limit 10, max 50.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "area": {"type": "string", "description": "Filter by area (optional)"},
                     "company": {"type": "string", "description": "Filter by company (optional)"},
+                    "limit": {"type": "integer", "description": "Max results to return (default 10, max 50)"},
                 },
                 "required": [],
             },
@@ -203,11 +204,14 @@ def register(all_reading_tools: list[str], all_writing_tools: list[str]) -> Tool
             return [TextContent(type="text", text=f"Decision recorded successfully:\n{json.dumps(new_decision, indent=2)}")]
 
         elif name == "get_decisions_history":
+            limit = arguments.get("limit", 10)
+
             # Use Supabase if available
             if _use_supabase():
                 decisions = sb_get_decisions(
                     area=arguments.get("area"),
                     company=arguments.get("company"),
+                    limit=limit,
                 )
                 return [TextContent(type="text", text=json.dumps(decisions, indent=2))]
 
@@ -221,6 +225,10 @@ def register(all_reading_tools: list[str], all_writing_tools: list[str]) -> Tool
                 decisions = [d for d in decisions if area.lower() in d.get("area", "").lower()]
             if company:
                 decisions = [d for d in decisions if d.get("company", "").lower() == company.lower()]
+
+            # Apply limit
+            limit = min(limit, 50)
+            decisions = decisions[:limit]
 
             return [TextContent(type="text", text=json.dumps(decisions, indent=2))]
 
