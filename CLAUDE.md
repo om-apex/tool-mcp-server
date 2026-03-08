@@ -40,7 +40,7 @@ Also: Cloudflare API (DNS Sentinel), Google Calendar API, Google Drive (local or
 |------|----------|
 | `CLI-ACCESS-REFERENCE.md` | CLIs, project map, ports, config, gotchas |
 | `DB-SCHEMA-QUICK-REF.md` | Table schemas for all Supabase projects |
-| `TEAM-PROTOCOL.md` | Multi-agent coordination, roles, sizing |
+| `TEAM-STRUCTURE.md` | Multi-agent coordination, roles, sizing (in `dotfiles/`) |
 | `SESSION-OPS.md` | Session start flow, .zshrc reference, known quirks |
 
 ## Key Patterns
