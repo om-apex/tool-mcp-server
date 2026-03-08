@@ -1,6 +1,6 @@
 # CLI Access Reference
 
-> Last updated: 2026-02-27
+> Last updated: 2026-03-08
 
 ## Installed CLIs
 
@@ -64,7 +64,7 @@ supabase db push
 | Project | URL | Platform |
 |---------|-----|----------|
 | Om Apex Public Site | https://om-apex-site.vercel.app | Vercel |
-| Owner Portal | https://om-portal.vercel.app | Vercel |
+| Owner Portal | https://portal.omapex.com | Vercel |
 | Om AI Solutions website | https://om-ai-site.vercel.app | Vercel |
 | Om Luxe Properties website | https://om-luxe-site.vercel.app | Vercel |
 | Om Supply Chain website | https://om-scm-site.vercel.app | Vercel |
@@ -117,6 +117,13 @@ cd ~/om-apex/products/om-cortex/frontend && npm run dev # Mission Control on por
 | `.env.factcheck` | Google Fact Check, Tavily API keys |
 | `.env.cortex` | Om Cortex Supabase + gateway credentials |
 | `.env.cloudflare` | Cloudflare API token |
+| `.env.data-sources` | FRED, BLS, Census, Alpha Vantage, Google Search API keys |
+| `.env.google-oauth` | Google OAuth client credentials |
+| `.env.hubspot` | HubSpot private app token |
+| `.env.plaid` | Plaid API credentials |
+| `.env.posthog` | PostHog project key + host |
+| `.env.quorum-admin` | AI Quorum admin credentials |
+| `.env.sentry` | Sentry DSNs (frontend + backend) |
 
 **Sync scripts:**
 - Mac: `~/om-apex/scripts/sync-env.sh`
@@ -322,6 +329,19 @@ Result: 5/5 models responding
 - After API key rotation — confirm new keys work
 - When models are timing out in production — isolate connectivity vs application issues
 - After deploy — sanity check backend can reach all providers
+
+## Production Support Stack (AI Quorum)
+
+| Service | Purpose | Tier | Config File |
+|---------|---------|------|-------------|
+| Sentry | Error monitoring | Free (10K errors/mo) | `.env.sentry` |
+| PostHog | Session replay + analytics | Free (2M events/mo, 5K recordings) | `.env.posthog` |
+| LLM Monitoring | Cost, latency, errors | Owner Portal | N/A (built-in) |
+| MCP Incidents | Bug filing from Claude Code | MCP tools | N/A (Cortex `prodsupport_incidents`) |
+
+**Sentry:** Frontend uses `@sentry/nextjs`, backend uses `sentry-sdk`. DSNs in `.env.sentry`.
+**PostHog:** Frontend uses `posthog-js`. Project key and host in `.env.posthog`.
+**Architecture (TECH-182):** Production support is an Om Cortex skill — receives Sentry/PostHog webhooks, triages via IncidentService.
 
 ## Gotchas
 
