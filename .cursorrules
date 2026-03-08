@@ -1,0 +1,155 @@
+# .cursorrules - Om Apex MCP Server
+
+## Project Overview
+
+**Path:** `/Users/nishad/om-apex/tools/mcp-server/`
+**GitHub:** https://github.com/om-apex/tool-mcp-server
+**Company:** Om Apex Holdings LLC
+**Tech Stack:** Python 3.10+ / MCP SDK / Supabase / Google Calendar API
+
+This is the Model Context Protocol (MCP) server that provides persistent memory across all Claude interfaces (Chat, Cowork, Claude Code). It stores business context, decisions, tasks, and generates branded documents.
+
+---
+
+## Folder Structure
+
+```
+/Users/nishad/om-apex/
+├── products/ai-quorum/
+├── websites/{apex,ai-solutions,luxe-properties,supply-chain}/
+├── tools/
+│   ├── mcp-server/              # THIS PROJECT
+│   └── crm-integration/
+├── shared/{brand-assets,company-configs,document-templates}/
+├── config/                      # CENTRALIZED API KEYS
+├── docs/
+└── archive/
+```
+
+---
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/om_apex_mcp/server.py` | Main MCP server with all tools |
+| `pyproject.toml` | Python dependencies |
+| `CLAUDE.md` | Context for Claude Code |
+| `data/` | Symlink to shared drive mcp-data |
+
+---
+
+## MCP Tools Available
+
+### Reading Tools
+- `get_full_context` - Load all context at session start
+- `get_company_context` - Company structure
+- `get_technology_decisions` - Tech stack decisions
+- `get_decisions_history` - All recorded decisions
+- `get_domain_inventory` - Domain list
+- `get_pending_tasks` - Task list
+- `get_daily_progress` - Session logs
+- `list_calendar_events` - Google Calendar
+
+### Writing Tools
+- `add_decision` - Record a decision
+- `add_task` / `complete_task` / `update_task` - Task management
+- `add_daily_progress` - Log session progress
+- `generate_branded_html` - Create branded documents
+- `create_calendar_event` / `delete_calendar_event` - Calendar management
+
+---
+
+## Data Storage
+
+Data is stored on Google Drive shared drive (synced across both laptops):
+
+- **Mac (Nishad):** `~/Library/CloudStorage/GoogleDrive-nishad@omapex.com/Shared drives/om-apex/mcp-data/`
+- **Windows (Sumedha):** `H:/Shared drives/om-apex/mcp-data/`
+
+JSON files:
+- `company_structure.json`
+- `technology_decisions.json`
+- `domain_inventory.json`
+- `pending_tasks.json`
+
+---
+
+## Local Development Ports (TECH-092)
+
+All Om Apex projects have dedicated ports:
+
+| Project | Port | URL |
+|---------|------|-----|
+| AI Quorum | 3000 | http://localhost:3000 |
+| Owner Portal | 3001 | http://localhost:3001 |
+| AI Solutions | 3002 | http://localhost:3002 |
+| Supply Chain | 3003 | http://localhost:3003 |
+| Luxe Properties | 3004 | http://localhost:3004 |
+
+**Note:** MCP server runs via Claude Desktop stdio, not HTTP ports.
+
+---
+
+## Development Commands
+
+```bash
+# Install in development mode
+pip install -e ".[dev]"
+
+# Run tests
+pytest tests/
+
+# Run linting
+ruff check src/
+
+# Start server locally (for testing)
+python -m om_apex_mcp.server
+```
+
+---
+
+## Git Sync Protocol (CRITICAL)
+
+This repo is edited from BOTH laptops (Nishad's Mac and Sumedha's Windows).
+
+**Before making changes:**
+```bash
+git pull origin main
+```
+
+**After making changes:**
+```bash
+git add -A && git commit -m "Description" && git push origin main
+```
+
+---
+
+## Centralized Configuration
+
+**Location:** `/Users/nishad/om-apex/config/`
+
+| File | Contents |
+|------|----------|
+| `.env.supabase` | Supabase credentials |
+| `.env.providers` | LLM API keys |
+| `.env.google` | Google Calendar credentials |
+
+**Never ask for API keys - they already exist in central config.**
+
+---
+
+## Code Standards
+
+- Python 3.10+ with type hints
+- Use `structlog` for logging
+- Async functions for I/O operations
+- Pydantic for data validation
+- Follow existing patterns in server.py
+
+---
+
+## Owner
+
+- **Nishad Tambe** - nishad@omapex.com
+- **Company** - Om Apex Holdings LLC
