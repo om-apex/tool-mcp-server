@@ -1,6 +1,6 @@
 # Database Schema Quick Reference
 
-> Last updated: 2026-03-05
+> Last updated: 2026-03-11
 
 ## Owner Portal (hympgocuivzxzxllgmcy)
 
@@ -132,6 +132,71 @@ Contact form submissions from all websites. Dual-write target (Supabase + HubSpo
 | created_at | TIMESTAMPTZ | Auto |
 
 **RLS:** Service role full access only. Indexes on `brand` and `email`.
+
+### newsletter_subscribers
+Subscriber lifecycle management for all 4 Om Apex sites. Created in TASK-413.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| email | TEXT NOT NULL | Subscriber email |
+| firstname | TEXT | First name |
+| lastname | TEXT | Last name |
+| brand | TEXT NOT NULL | `om_supply_chain`, `om_ai_solutions`, `om_luxe_properties`, `om_apex_holdings` |
+| status | TEXT NOT NULL | `pending_verification`, `active`, `unsubscribed`, `bounced`, `complained` (default: pending_verification) |
+| verification_token | UUID | Auto-generated, used for double opt-in confirmation |
+| unsubscribe_token | UUID | Auto-generated, permanent per subscriber |
+| verified_at | TIMESTAMPTZ | When subscriber confirmed |
+| unsubscribed_at | TIMESTAMPTZ | When subscriber opted out |
+| hubspot_contact_id | TEXT | HubSpot contact ID |
+| metadata | JSONB | Additional data (default: {}) |
+| created_at | TIMESTAMPTZ | Auto |
+| updated_at | TIMESTAMPTZ | Auto (trigger) |
+
+**RLS:** Service role full access only. **Unique constraint:** `(email, brand)`. Indexes on `brand`, `status`, `email`, `verification_token`, `unsubscribe_token`.
+
+### newsletter_sends
+Newsletter campaign tracking. Each row = one newsletter send to a brand's subscribers.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| brand | TEXT NOT NULL | Same brand values as newsletter_subscribers |
+| subject | TEXT NOT NULL | Email subject line |
+| preview_text | TEXT | Email preview text |
+| content_markdown | TEXT | Source markdown content |
+| content_html | TEXT | Rendered HTML content |
+| status | TEXT NOT NULL | `draft`, `scheduled`, `sending`, `sent`, `failed` (default: draft) |
+| scheduled_for | TIMESTAMPTZ | Scheduled send time |
+| sent_at | TIMESTAMPTZ | Actual send time |
+| total_recipients | INTEGER | Count of recipients (default: 0) |
+| total_delivered | INTEGER | Count delivered (default: 0) |
+| total_opened | INTEGER | Count opened (default: 0) |
+| total_clicked | INTEGER | Count clicked (default: 0) |
+| total_bounced | INTEGER | Count bounced (default: 0) |
+| created_by | TEXT NOT NULL | Who created (default: system) |
+| created_at | TIMESTAMPTZ | Auto |
+| updated_at | TIMESTAMPTZ | Auto (trigger) |
+
+**RLS:** Service role full access only. Indexes on `brand`, `status`, `sent_at DESC`, `(brand, sent_at DESC)`.
+
+### newsletter_send_recipients
+Per-recipient delivery tracking for each newsletter send.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID PK | Auto-generated |
+| send_id | UUID NOT NULL | FK → newsletter_sends(id) ON DELETE CASCADE |
+| subscriber_id | UUID NOT NULL | FK → newsletter_subscribers(id) ON DELETE CASCADE |
+| sendgrid_message_id | TEXT | SendGrid tracking ID |
+| status | TEXT NOT NULL | `queued`, `sent`, `delivered`, `opened`, `clicked`, `bounced`, `failed` (default: queued) |
+| delivered_at | TIMESTAMPTZ | Delivery timestamp |
+| opened_at | TIMESTAMPTZ | First open timestamp |
+| clicked_at | TIMESTAMPTZ | First click timestamp |
+| error_message | TEXT | Error details if failed |
+| created_at | TIMESTAMPTZ | Auto |
+
+**RLS:** Service role full access only. **Unique constraint:** `(send_id, subscriber_id)`. Indexes on `send_id`, `subscriber_id`, `status`, `sendgrid_message_id`.
 
 ### dns_services
 Reusable DNS record templates (e.g., "google-workspace" = 5 MX + SPF + DKIM + DMARC).
