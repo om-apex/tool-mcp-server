@@ -1,6 +1,6 @@
 # Om Apex MCP Server
 
-Model Context Protocol server providing persistent memory and tools across all Claude interfaces. 55 tools across 9 modules.
+Model Context Protocol server providing persistent memory and tools across all Claude interfaces. 59 tools across 10 modules.
 
 ## Architecture
 - **Language:** Python 3.12
@@ -18,9 +18,9 @@ Model Context Protocol server providing persistent memory and tools across all C
 | AI Quorum | `ixncscosicyjzlopbfiz` | Quorum diagnostics (sessions, turns, config) |
 | Om Cortex | `sgcfettixymowtokytwk` | Production incidents |
 
-Also: Cloudflare API (DNS Sentinel), Google Calendar API, Google Drive (local or API).
+Also: Cloudflare API (DNS Sentinel), Miro REST API v2 (board management), Google Calendar API, Google Drive (local or API).
 
-## Tool Modules (55 tools)
+## Tool Modules (59 tools)
 
 | Module | File | Tools | Purpose |
 |--------|------|-------|---------|
@@ -33,6 +33,7 @@ Also: Cloudflare API (DNS Sentinel), Google Calendar API, Google Drive (local or
 | AI Quorum | `tools/ai_quorum.py` | 10 | Quorum product diagnostics |
 | Incidents | `tools/incidents.py` | 2 | Production incident tracking |
 | DNS Sentinel | `tools/dns_sentinel.py` | 10 | DNS audit, auto-heal, change mgmt |
+| Miro | `tools/miro.py` | 3 | Miro board lifecycle (create, list, delete) |
 
 ## Reference Docs (in `docs/`)
 
