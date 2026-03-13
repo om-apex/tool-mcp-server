@@ -42,7 +42,7 @@ try:
     from .storage import StorageBackend, LocalStorage
     from .tools import ToolModule
     from .tools.helpers import init_storage
-    from .tools import context, tasks, progress, documents, calendar, handoff, ai_quorum, incidents, dns_sentinel, miro
+    from .tools import context, tasks, progress, documents, calendar, handoff, ai_quorum, incidents, dns_sentinel
 except ImportError as e:
     logger.critical(f"Failed to import local modules: {e}")
     logger.critical(f"Traceback:\n{traceback.format_exc()}")
@@ -53,8 +53,7 @@ except ImportError as e:
 _CORE_MODULES = frozenset({"tasks", "progress", "calendar", "handoff", "ai_quorum", "incidents", "context"})
 _DNS_MODULES = frozenset({"dns_sentinel"})
 _DOCS_MODULES = frozenset({"documents"})
-_MIRO_MODULES = frozenset({"miro"})
-_ALL_MODULES = _CORE_MODULES | _DNS_MODULES | _DOCS_MODULES | _MIRO_MODULES
+_ALL_MODULES = _CORE_MODULES | _DNS_MODULES | _DOCS_MODULES
 
 SERVER_GROUPS = {
     "core": _CORE_MODULES,
@@ -101,7 +100,7 @@ def create_server(backend: Optional[StorageBackend] = None, group: Optional[str]
     # Phase 3: Register tool modules (filtered by group)
     modules: list[ToolModule] = []
     _task_mod = _progress_mod = _documents_mod = _calendar_mod = None
-    _handoff_mod = _quorum_mod = _incidents_mod = _dns_sentinel_mod = _miro_mod = None
+    _handoff_mod = _quorum_mod = _incidents_mod = _dns_sentinel_mod = None
 
     if "tasks" in allowed:
         try:
@@ -175,15 +174,6 @@ def create_server(backend: Optional[StorageBackend] = None, group: Optional[str]
             logger.error(f"Failed to load DNS Sentinel module: {e}")
             logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-    if "miro" in allowed:
-        try:
-            _miro_mod = miro.register()
-            modules.append(_miro_mod)
-            logger.info(f"Miro module loaded ({len(_miro_mod.tools)} tools)")
-        except Exception as e:
-            logger.error(f"Failed to load Miro module: {e}")
-            logger.error(f"Traceback:\n{traceback.format_exc()}")
-
     # Phase 4: Build tool lists and register context module (core + all groups only)
     if "context" in allowed:
         try:
@@ -191,7 +181,7 @@ def create_server(backend: Optional[StorageBackend] = None, group: Optional[str]
             _all_writing = context.WRITING.copy()
 
             for mod in [_task_mod, _progress_mod, _documents_mod, _calendar_mod,
-                        _handoff_mod, _quorum_mod, _incidents_mod, _dns_sentinel_mod, _miro_mod]:
+                        _handoff_mod, _quorum_mod, _incidents_mod, _dns_sentinel_mod]:
                 if mod:
                     _all_reading += mod.reading_tools
                     _all_writing += mod.writing_tools

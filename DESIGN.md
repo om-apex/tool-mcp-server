@@ -2,7 +2,7 @@
 
 ## Overview
 
-Model Context Protocol (MCP) server providing persistent memory and tools across all Claude interfaces (Chat, Cowork, Claude Code). 59 tools across 10 modules for managing company context, tasks, decisions, documents, calendar, session handoffs, AI Quorum diagnostics, production incidents, DNS security, and Miro board management.
+Model Context Protocol (MCP) server providing persistent memory and tools across all Claude interfaces (Chat, Cowork, Claude Code). 56 tools across 9 modules for managing company context, tasks, decisions, documents, calendar, session handoffs, AI Quorum diagnostics, production incidents, and DNS security.
 
 ## Tech Stack
 
@@ -30,8 +30,7 @@ mcp-server/
 │   ├── supabase_client.py     # Supabase client (tasks, decisions, handoff)
 │   ├── quorum_supabase.py     # AI Quorum DB integration
 │   ├── cloudflare_client.py   # Cloudflare DNS API client (async, httpx)
-│   ├── miro_client.py         # Miro REST API v2 client (async, httpx)
-│   └── tools/                 # 10 tool modules
+│   └── tools/                 # 9 tool modules
 │       ├── __init__.py        # ToolModule dataclass
 │       ├── helpers.py         # Shared utilities, storage init
 │       ├── context.py         # Company context (7 tools)
@@ -42,8 +41,7 @@ mcp-server/
 │       ├── handoff.py         # Session handoff (2 tools)
 │       ├── ai_quorum.py       # Quorum diagnostics (10 tools)
 │       ├── incidents.py       # Production incidents (2 tools)
-│       ├── dns_sentinel.py    # DNS audit + heal (10 tools)
-│       └── miro.py            # Miro board management (3 tools)
+│       └── dns_sentinel.py    # DNS audit + heal (10 tools)
 ├── data/
 │   ├── context/               # JSON fallback files
 │   └── demo/                  # Demo data (bundled in Docker)
@@ -81,7 +79,6 @@ mcp-server/
 | **AI Quorum** (10) | get_quorum_status, list_quorum_sessions, get_quorum_turn_detail, get_quorum_turn_trace, get_quorum_logs, get_quorum_model_performance, get_quorum_cost_summary, get_quorum_stage_config, update_quorum_stage_config, get_quorum_user_detail | Diagnostics for AI Quorum product |
 | **Incidents** (2) | incident_create, incident_list | Production incident tracking (Om Cortex Supabase) |
 | **DNS Sentinel** (10) | dns_snapshot, dns_audit, dns_heal, dns_approve, dns_reject, dns_view_config, dns_view_approvals, dns_view_changes, dns_view_snapshot, dns_update_config | DNS audit, auto-heal, and change management for all 21 Cloudflare domains |
-| **Miro** (3) | create_board, list_boards, delete_board | Miro board lifecycle management via REST API v2 |
 
 ## Storage Backends
 
@@ -146,11 +143,10 @@ Each module loads independently — failure of one module doesn't crash the serv
 | `GOOGLE_SHARED_DRIVE_ID` | Shared drive ID |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API token (DNS Sentinel) |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID (DNS Sentinel) |
-| `MIRO_OAUTH_TOKEN` | Miro OAuth token (board management) |
 | `SENDGRID_API_KEY` | SendGrid API key for DNS alert emails (optional — Phase 3) |
 | `PORT` | HTTP server port (default: 8000) |
 
-**Config file locations (local):** All keys stored in `~/om-apex/config/`. Cloudflare keys in `.env.cloudflare`. Miro token in `.env.miro`.
+**Config file locations (local):** All keys stored in `~/om-apex/config/`. Cloudflare keys in `.env.cloudflare`.
 
 ## DNS Sentinel
 
@@ -190,16 +186,6 @@ dns_heal(dry_run=True)               # Preview auto-fixes
 dns_heal(dry_run=False)              # Apply auto-fixes
 ```
 
-## Miro Board Management
-
-Board lifecycle operations for Miro via REST API v2. Complements the official `@llmindset/mcp-miro` Claude plugin which provides content creation (diagrams, tables, docs) but lacks board management.
-
-### Architecture
-- **Miro client** (`miro_client.py`): Async httpx client. Singleton config from `~/om-apex/config/.env.miro`. Board CRUD operations.
-- **MCP tools** (`tools/miro.py`): 3 tools — `create_board`, `list_boards`, `delete_board`.
-- **Auth**: OAuth Bearer token (same token as `@llmindset/mcp-miro` plugin).
-- **API base**: `https://api.miro.com/v2`
-- **Pagination**: `list_boards` handles cursor-based pagination automatically.
 
 ## Deployment
 
