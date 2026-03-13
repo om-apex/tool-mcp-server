@@ -32,6 +32,9 @@ except ImportError:
 # Global client instance
 _supabase_client = None
 
+# Cache for project_code -> UUID mapping (populated on first call)
+_project_code_cache: dict[str, str] = {}
+
 # Timeout for Supabase operations (seconds)
 SUPABASE_TIMEOUT = int(os.environ.get("SUPABASE_TIMEOUT", "10"))
 
@@ -342,6 +345,68 @@ def get_next_task_id() -> str:
     except Exception as e:
         logger.error(f"Error getting next task ID: {e}")
         return "TASK-001"
+
+
+def resolve_project_code(project_code: str) -> str:
+    """Resolve a human-friendly project code to its UUID.
+
+    Queries the `projects` table and caches the mapping. Handles the
+    special case where 'root' maps to project_folder 'om-apex'.
+
+    Args:
+        project_code: Human-friendly code (e.g., 'mcp-server', 'portal', 'root').
+
+    Returns:
+        The project UUID string.
+
+    Raises:
+        ValueError: If the project_code is not found in the projects table.
+        RuntimeError: If Supabase is not available.
+    """
+    global _project_code_cache
+
+    # Map 'root' to the actual project_folder value
+    lookup_code = "om-apex" if project_code == "root" else project_code
+
+    # Return from cache if populated
+    if _project_code_cache:
+        if lookup_code in _project_code_cache:
+            return _project_code_cache[lookup_code]
+        valid = sorted(_project_code_cache.keys())
+        raise ValueError(
+            f"Invalid project_code '{project_code}'. "
+            f"Valid codes: {valid} (use 'root' for om-apex)"
+        )
+
+    # Populate cache from projects table
+    try:
+        client = get_supabase_client()
+        if not client:
+            raise RuntimeError("Supabase not available - cannot resolve project_code")
+
+        response = client.table("projects").select("id, project_folder").execute()
+        if not response.data:
+            raise RuntimeError("No projects found in projects table")
+
+        _project_code_cache = {
+            row["project_folder"]: row["id"]
+            for row in response.data
+            if row.get("project_folder")
+        }
+
+        if lookup_code in _project_code_cache:
+            return _project_code_cache[lookup_code]
+
+        valid = sorted(_project_code_cache.keys())
+        raise ValueError(
+            f"Invalid project_code '{project_code}'. "
+            f"Valid codes: {valid} (use 'root' for om-apex)"
+        )
+    except (ValueError, RuntimeError):
+        raise
+    except Exception as e:
+        logger.error(f"Error resolving project_code '{project_code}': {e}")
+        raise RuntimeError(f"Failed to resolve project_code: {e}") from e
 
 
 def get_task_queue(

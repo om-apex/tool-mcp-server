@@ -1,6 +1,6 @@
 # Database Schema Quick Reference
 
-> Last updated: 2026-03-11
+> Last updated: 2026-03-12
 
 ## Owner Portal (hympgocuivzxzxllgmcy)
 
@@ -17,7 +17,7 @@ Central task tracker for all Om Apex companies.
 | status | TEXT | `created`, `assigned-to-claude`, `notes-prd-unclear`, `approved-for-prd`, `prd-to-review`, `ready-to-plan`, `planning-in-progress`, `plan-to-review`, `ready-to-code`, `coding-in-progress`, `ready-for-manual-review`, `complete` |
 | owner | TEXT | Person name (Nishad, Sumedha, Claude, etc.) |
 | notes | TEXT | Additional notes |
-| project_code | TEXT | Optional project code |
+| project_id | UUID | FK to projects.id — resolved from project_code at creation time |
 | duration_days | INTEGER | Estimated duration |
 | due | DATE | Due date |
 | created_at | TIMESTAMPTZ | Auto |

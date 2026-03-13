@@ -23,6 +23,7 @@ from ..supabase_client import (
     add_task as sb_add_task,
     update_task as sb_update_task,
     get_next_task_id,
+    resolve_project_code,
 )
 
 
@@ -102,8 +103,9 @@ def register() -> ToolModule:
                     "prd_path": {"type": "string", "description": "Relative path to PRD file, e.g. 'docs/plans/TASK-nnn/PRD-nnn.md' (optional)"},
                     "commit_refs": {"type": "array", "items": {"type": "string"}, "description": "Git commit SHAs associated with this task (optional)"},
                     "issue_ref": {"type": "string", "description": "GitHub issue reference, e.g. 'om-apex/repo#123' (optional)"},
+                    "project_code": {"type": "string", "description": "Project code (e.g., mcp-server, portal, ai-quorum, root). Required."},
                 },
-                "required": ["description", "category", "company", "priority"],
+                "required": ["description", "category", "company", "priority", "project_code"],
             },
         ),
         Tool(
@@ -147,6 +149,7 @@ def register() -> ToolModule:
                     "plan_folder": {"type": "string", "description": "Relative path to plan folder (optional)"},
                     "approved_by": {"type": "string", "description": "Name of approver (optional)"},
                     "approved_at": {"type": "string", "description": "Approval timestamp in ISO format (optional)"},
+                    "project_code": {"type": "string", "description": "Project code to associate with task (e.g., mcp-server, portal, ai-quorum, root). Optional."},
                 },
                 "required": ["task_id"],
             },
@@ -215,6 +218,14 @@ def register() -> ToolModule:
 
         elif name == "add_task":
             _require_supabase()
+
+            # Resolve project_code to UUID
+            project_code = arguments["project_code"]
+            try:
+                project_id = resolve_project_code(project_code)
+            except ValueError as e:
+                return [TextContent(type="text", text=f"Error: {e}")]
+
             description = arguments["description"]
             owner = None
             owner_match = re.search(r'\(([A-Za-z]+)\)\s*$', description)
@@ -231,6 +242,7 @@ def register() -> ToolModule:
                 "priority": arguments["priority"],
                 "status": "created",
                 "created_at": datetime.now().isoformat(),
+                "project_id": project_id,
             }
             if owner:
                 new_task["owner"] = owner
@@ -350,6 +362,13 @@ def register() -> ToolModule:
             if arguments.get("approved_at"):
                 updates["approved_at"] = arguments["approved_at"]
                 updated_fields.append("approved_at")
+            if arguments.get("project_code"):
+                try:
+                    project_uuid = resolve_project_code(arguments["project_code"])
+                    updates["project_id"] = project_uuid
+                    updated_fields.append("project_id")
+                except ValueError as e:
+                    return [TextContent(type="text", text=f"Error: {e}")]
 
             if not updates:
                 return [TextContent(type="text", text=f"No updates provided for task {task_id}")]
