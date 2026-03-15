@@ -156,7 +156,7 @@ def register() -> ToolModule:
         ),
         Tool(
             name="update_quorum_stage_config",
-            description="Update a stage's configuration (only allowed on draft versions). Can update timeout_ms, prompt_template, etc.",
+            description="Update a stage's configuration (only allowed on draft versions). Can update timeout_ms, prompt_template, polling_mode, stage_name, etc.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -164,6 +164,14 @@ def register() -> ToolModule:
                     "updates": {
                         "type": "object",
                         "description": "Fields to update: timeout_ms, prompt_template, polling_mode, stage_name, etc.",
+                    },
+                    "route_type": {
+                        "type": "string",
+                        "description": "Route type for prompt template targeting (default: '__ALL__'). Use with prompt_template updates.",
+                    },
+                    "model_code": {
+                        "type": "string",
+                        "description": "Model code for prompt template targeting (default: '__ALL__'). Use with prompt_template updates.",
                     },
                 },
                 "required": ["stage_id", "updates"],
@@ -589,6 +597,21 @@ def _handle_stage_config(arguments: dict):
         except Exception:
             stage["models"] = []
 
+    # Get prompt templates for each stage (TASK-470)
+    for stage in stages:
+        try:
+            prompts_resp = (
+                client.table("orch_prompt_templates")
+                .select("id,route_type,model_code,prompt_template,prompt_version,is_active")
+                .eq("stage_id", stage["id"])
+                .eq("config_version_id", version["id"])
+                .order("route_type,model_code")
+                .execute()
+            )
+            stage["prompt_templates"] = prompts_resp.data or []
+        except Exception:
+            stage["prompt_templates"] = []
+
     return _json_response({
         "version": version,
         "stages": stages,
@@ -617,11 +640,41 @@ def _handle_update_stage_config(arguments: dict):
             text=f"Cannot update stage: config version status is '{ver_resp.data[0]['status']}'. Only 'draft' versions can be modified."
         )]
 
-    # Apply updates
-    resp = client.table("orch_stages").update(updates).eq("id", stage_id).execute()
-    if resp.data:
-        return _json_response({"message": "Stage updated successfully", "stage": resp.data[0]})
-    return [TextContent(type="text", text=f"Update returned no data for stage {stage_id}")]
+    # TASK-470: Intercept prompt_template updates → route to orch_prompt_templates
+    prompt_result = None
+    if "prompt_template" in updates:
+        prompt_text = updates.pop("prompt_template")
+        route_type = arguments.get("route_type", "__ALL__")
+        model_code = arguments.get("model_code", "__ALL__")
+        config_version_id = stage["config_version_id"]
+
+        prompt_result = (
+            client.table("orch_prompt_templates")
+            .upsert(
+                {
+                    "config_version_id": config_version_id,
+                    "stage_id": stage_id,
+                    "route_type": route_type,
+                    "model_code": model_code,
+                    "prompt_template": prompt_text,
+                    "is_active": True,
+                },
+                on_conflict="config_version_id,stage_id,route_type,model_code",
+            )
+            .execute()
+        )
+
+    # Apply remaining updates to orch_stages (if any non-prompt fields remain)
+    if updates:
+        resp = client.table("orch_stages").update(updates).eq("id", stage_id).execute()
+        if resp.data:
+            return _json_response({"message": "Stage updated successfully", "stage": resp.data[0]})
+        return [TextContent(type="text", text=f"Update returned no data for stage {stage_id}")]
+
+    # Prompt-only update — return prompt result
+    if prompt_result and prompt_result.data:
+        return _json_response({"message": "Prompt template updated in orch_prompt_templates", "prompt": prompt_result.data[0]})
+    return _json_response({"message": "No updates applied"})
 
 
 def _handle_user_detail(arguments: dict):
