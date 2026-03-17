@@ -28,8 +28,8 @@ Central task tracker for all Om Apex companies.
 | commit_refs | TEXT[] | Git commit SHAs associated with task |
 | issue_ref | TEXT | GitHub issue reference (e.g., `om-apex/repo#123`) |
 | source | TEXT | Task origin: `nishad`, `user-report`, `claude-code`, `sentry`, `posthog` (default: nishad) |
-| prd_path | TEXT | Relative path to PRD file, e.g. `docs/plans/TASK-nnn/PRD-nnn.md` |
-| plan_folder | TEXT | Relative path to plan folder, e.g. `docs/plans/TASK-nnn/` |
+| prd_path | TEXT | Relative path to PRD/FIX file, e.g. `docs/tasks/DEV-nnn/PRD-nnn.md` (enhancements) or `docs/tasks/ISSUE-nnn/FIX-nnn.md` (issues). Pre-TASK-504 tasks use `docs/plans/TASK-nnn/` |
+| plan_folder | TEXT | Relative path to plan folder, e.g. `docs/tasks/DEV-nnn/` or `docs/tasks/ISSUE-nnn/`. Pre-TASK-504 tasks use `docs/plans/TASK-nnn/` |
 | approved_by | TEXT | Name of approver at most recent approval gate |
 | approved_at | TIMESTAMPTZ | Timestamp of most recent approval gate passage |
 
