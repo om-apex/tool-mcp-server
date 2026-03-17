@@ -9,7 +9,7 @@ Central task tracker for all Om Apex companies.
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | TEXT PK | Format: `TASK-001` (auto-generated) |
+| id | TEXT PK | Format: `DEV-nnn` (enhancement/feature/dev/manual), `ISSUE-nnn` (issue). Legacy: `TASK-nnn`. Shared counter across all prefixes. |
 | description | TEXT | Task description |
 | category | TEXT | Technical, Marketing, Legal, Operations, Administrative, Content |
 | company | TEXT | Om Apex Holdings, Om Luxe Properties, Om AI Solutions, Om Supply Chain |
@@ -88,29 +88,19 @@ Templates for generating branded documents.
 | created_at | TIMESTAMPTZ | Auto |
 | updated_at | TIMESTAMPTZ | Auto |
 
-### session_handoff
-Single-row table for cross-laptop context sync (upserted each session end).
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | INTEGER PK | Always 1, enforced by CHECK constraint |
-| content | TEXT | Full markdown handoff content |
-| created_by | TEXT | "Nishad" or "Sumedha" |
-| interface | TEXT | "code", "code-app", "chat", "cowork" |
-| created_at | TIMESTAMPTZ | Auto |
-| updated_at | TIMESTAMPTZ | Last upsert time |
-
 ### session_handoff_history
-Archived previous handoffs for audit/review.
+Session handoff archive. Primary handoff is local `handoff.md` files; this table stores history.
+`session_handoff` singleton table was dropped in TASK-505.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | BIGINT PK | Auto-generated identity |
-| content | TEXT | Archived handoff content |
+| content | TEXT | Handoff content |
 | created_by | TEXT | Who wrote it |
 | interface | TEXT | Which interface |
-| session_date | DATE | Date of the archived session |
-| created_at | TIMESTAMPTZ | When archived |
+| session_date | DATE | Date of the session |
+| project_code | TEXT | Project code (e.g., "ai-quorum", "mcp-server"). Required on new inserts; NULL on legacy rows. |
+| created_at | TIMESTAMPTZ | When inserted |
 
 ### leads
 Contact form submissions from all websites. Dual-write target (Supabase + HubSpot).
