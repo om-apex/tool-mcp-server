@@ -29,7 +29,7 @@ Also: Cloudflare API (DNS Sentinel), Google Calendar API, Google Drive (local or
 | Progress | `tools/progress.py` | 3 | Session logging to files |
 | Documents | `tools/documents.py` | 11 | Document generation + branding |
 | Calendar | `tools/calendar.py` | 3 | Google Calendar API |
-| Handoff | `tools/handoff.py` | 2 | Cross-device session state |
+| Handoff | `tools/handoff.py` | 2 | Session handoff history (per-project) |
 | AI Quorum | `tools/ai_quorum.py` | 10 | Quorum product diagnostics |
 | Incidents | `tools/incidents.py` | 2 | Production incident tracking |
 | DNS Sentinel | `tools/dns_sentinel.py` | 10 | DNS audit, auto-heal, change mgmt |

@@ -233,7 +233,8 @@ def register() -> ToolModule:
                 owner = owner_match.group(1).capitalize()
                 description = re.sub(r'\s*\([A-Za-z]+\)\s*$', '', description)
 
-            new_id = get_next_task_id()
+            task_type = arguments.get("task_type", "enhancement")
+            new_id = get_next_task_id(task_type)
             new_task = {
                 "id": new_id,
                 "description": description,
@@ -248,8 +249,8 @@ def register() -> ToolModule:
                 new_task["owner"] = owner
             if arguments.get("notes"):
                 new_task["notes"] = arguments["notes"]
-            if arguments.get("task_type"):
-                new_task["task_type"] = arguments["task_type"]
+            if task_type:
+                new_task["task_type"] = task_type
             if arguments.get("source"):
                 new_task["source"] = arguments["source"]
             if arguments.get("prd_path"):

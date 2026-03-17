@@ -311,40 +311,55 @@ def update_task(task_id: str, updates: dict) -> Optional[dict]:
         raise RuntimeError(f"Failed to update task: {e}") from e
 
 
-def get_next_task_id() -> str:
-    """Get the next available task ID.
+def get_next_task_id(task_type: str = "enhancement") -> str:
+    """Get the next available task ID with prefix based on task_type.
+
+    Uses a shared counter across all prefixes (TASK, DEV, ISSUE) to prevent
+    number collisions. Continues from the global max numeric suffix.
+
+    Args:
+        task_type: One of 'enhancement', 'feature-request', 'dev', 'manual', 'issue'.
 
     Returns:
-        Next task ID (e.g., TASK-042). Returns TASK-001 on error.
+        Next task ID (e.g., DEV-506, ISSUE-507). Returns DEV-001 or ISSUE-001 on error.
     """
+    PREFIX_MAP = {
+        "enhancement": "DEV",
+        "feature-request": "DEV",
+        "dev": "DEV",
+        "manual": "DEV",
+        "issue": "ISSUE",
+    }
+    prefix = PREFIX_MAP.get(task_type, "DEV")
+
     try:
         client = get_supabase_client()
         if not client:
-            logger.debug("get_next_task_id: Supabase not available, returning TASK-001")
-            return "TASK-001"
+            logger.debug(f"get_next_task_id: Supabase not available, returning {prefix}-001")
+            return f"{prefix}-001"
 
-        response = (
-            client.table("tasks")
-            .select("id")
-            .like("id", "TASK-%")
-            .order("id", desc=True)
-            .limit(1)
-            .execute()
-        )
+        # Query all known ID prefixes to find global max number
+        max_num = 0
+        for pattern in ["TASK-%", "DEV-%", "ISSUE-%"]:
+            response = (
+                client.table("tasks")
+                .select("id")
+                .like("id", pattern)
+                .execute()
+            )
+            if response.data:
+                for row in response.data:
+                    try:
+                        num = int(row["id"].split("-", 1)[1])
+                        if num > max_num:
+                            max_num = num
+                    except (ValueError, IndexError):
+                        pass
 
-        if response.data:
-            last_id = response.data[0]["id"]
-            try:
-                num = int(last_id.split("-")[1])
-                return f"TASK-{num + 1:03d}"
-            except (ValueError, IndexError) as parse_err:
-                logger.warning(f"Could not parse task ID '{last_id}': {parse_err}")
-                pass
-
-        return "TASK-001"
+        return f"{prefix}-{max_num + 1:03d}"
     except Exception as e:
         logger.error(f"Error getting next task ID: {e}")
-        return "TASK-001"
+        return f"{prefix}-001"
 
 
 def resolve_project_code(project_code: str) -> str:
@@ -782,43 +797,19 @@ def has_company_configs_table() -> bool:
 # Session Handoff Operations
 # =============================================================================
 
-def get_session_handoff() -> Optional[dict]:
-    """Get the current session handoff from Supabase.
+def save_session_handoff(content: str, created_by: str, interface: str, project_code: str) -> dict:
+    """Save a session handoff to history.
 
-    Returns:
-        Handoff dictionary with content, created_by, interface, timestamps.
-        None if no handoff exists or Supabase unavailable.
-    """
-    try:
-        client = get_supabase_client()
-        if not client:
-            logger.debug("get_session_handoff: Supabase not available")
-            return None
-
-        response = client.table("session_handoff").select("*").eq("id", 1).execute()
-        if response.data:
-            return response.data[0]
-        return None
-    except Exception as e:
-        logger.error(f"Error fetching session handoff: {e}")
-        logger.error(f"Traceback:\n{traceback.format_exc()}")
-        return None
-
-
-def save_session_handoff(content: str, created_by: str, interface: str, checkpoint: bool = False) -> dict:
-    """Save (upsert) the session handoff to Supabase.
-
-    Archives the previous handoff to history before overwriting,
-    unless checkpoint=True (lightweight update, no history archive).
+    Inserts directly into session_handoff_history. No singleton upsert.
 
     Args:
         content: Full markdown handoff content.
         created_by: Who wrote this ("Nishad" or "Sumedha").
         interface: Which Claude interface ("code", "chat", "cowork", "code-app").
-        checkpoint: If True, skip archiving to history (mid-session checkpoint).
+        project_code: Project code for this handoff (e.g., "ai-quorum", "mcp-server").
 
     Returns:
-        The saved handoff record.
+        The inserted history record.
 
     Raises:
         RuntimeError: If Supabase is not available or save fails.
@@ -828,39 +819,20 @@ def save_session_handoff(content: str, created_by: str, interface: str, checkpoi
         if not client:
             raise RuntimeError("Supabase not available - cannot save handoff")
 
-        # Archive previous handoff to history (skip for checkpoints)
-        if not checkpoint:
-            try:
-                existing = client.table("session_handoff").select("*").eq("id", 1).execute()
-                if existing.data:
-                    old = existing.data[0]
-                    from datetime import datetime
-                    client.table("session_handoff_history").insert({
-                        "content": old["content"],
-                        "created_by": old["created_by"],
-                        "interface": old["interface"],
-                        "session_date": old.get("updated_at", datetime.now().isoformat())[:10],
-                    }).execute()
-                    logger.info("Previous handoff archived to history")
-            except Exception as archive_err:
-                logger.warning(f"Could not archive previous handoff: {archive_err}")
-
-        # Upsert current handoff
         from datetime import datetime
-        handoff = {
-            "id": 1,
+        record = {
             "content": content,
             "created_by": created_by,
             "interface": interface,
-            "updated_at": datetime.now().isoformat(),
+            "session_date": datetime.now().strftime("%Y-%m-%d"),
+            "project_code": project_code,
         }
 
-        response = client.table("session_handoff").upsert(handoff).execute()
+        response = client.table("session_handoff_history").insert(record).execute()
         if response.data:
-            mode = "checkpoint" if checkpoint else "full"
-            logger.info(f"Session handoff saved ({mode}) by {created_by} via {interface}")
+            logger.info(f"Session handoff saved for {project_code} by {created_by} via {interface}")
             return response.data[0]
-        return handoff
+        return record
     except RuntimeError:
         raise
     except Exception as e:
@@ -869,10 +841,11 @@ def save_session_handoff(content: str, created_by: str, interface: str, checkpoi
         raise RuntimeError(f"Failed to save handoff: {e}") from e
 
 
-def get_handoff_history(limit: int = 10, created_by: str | None = None) -> list[dict]:
-    """Get previous session handoffs from history.
+def get_handoff_history(project_code: str, limit: int = 10, created_by: str | None = None) -> list[dict]:
+    """Get previous session handoffs from history for a project.
 
     Args:
+        project_code: Project code to filter by (required).
         limit: Max number of records to return.
         created_by: Optional filter — only return entries by this instance/person.
 
@@ -885,6 +858,7 @@ def get_handoff_history(limit: int = 10, created_by: str | None = None) -> list[
             return []
 
         query = client.table("session_handoff_history").select("*")
+        query = query.eq("project_code", project_code)
         if created_by:
             query = query.eq("created_by", created_by)
         response = query.order("created_at", desc=True).limit(limit).execute()

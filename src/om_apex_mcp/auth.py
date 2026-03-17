@@ -29,7 +29,7 @@ DEMO_MODE_TOOLS = [
     "get_daily_progress",
     "search_daily_progress",
     "list_company_configs",
-    "get_session_handoff",
+    "get_handoff_history",
 ]
 
 
