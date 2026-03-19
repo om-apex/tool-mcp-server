@@ -424,6 +424,45 @@ def resolve_project_code(project_code: str) -> str:
         raise RuntimeError(f"Failed to resolve project_code: {e}") from e
 
 
+def _get_project_id_to_code_map() -> dict[str, str]:
+    """Build a reverse mapping from project UUID to project_folder (code).
+
+    Queries the projects table once and caches in the module-level
+    _project_code_cache (populating it as a side effect if empty).
+
+    Returns:
+        Dict mapping project UUID → project_folder code.
+        Empty dict on error.
+    """
+    global _project_code_cache
+
+    # If forward cache is populated, just invert it
+    if _project_code_cache:
+        return {v: k for k, v in _project_code_cache.items()}
+
+    try:
+        client = get_supabase_client()
+        if not client:
+            return {}
+
+        response = client.table("projects").select("id, project_folder").execute()
+        if not response.data:
+            return {}
+
+        # Populate forward cache as side effect
+        _project_code_cache = {
+            row["project_folder"]: row["id"]
+            for row in response.data
+            if row.get("project_folder")
+        }
+
+        # Return reverse map
+        return {row["id"]: row["project_folder"] for row in response.data if row.get("project_folder")}
+    except Exception as e:
+        logger.error(f"Error building project ID map: {e}")
+        return {}
+
+
 def get_task_queue(
     limit: int = 10,
     owner: Optional[str] = None,
@@ -431,21 +470,31 @@ def get_task_queue(
     status: Optional[str] = None,
     company: Optional[str] = None,
     source: Optional[str] = None,
+    task_type: Optional[str] = None,
 ) -> list[dict]:
-    """Get a compact task queue sorted by priority then age.
+    """Get a compact task queue grouped by project, top 2 per project.
+
+    Returns tasks grouped by project_code with the most recently updated
+    tasks first. Excludes 'manual' task_type by default (these are physical
+    tasks not relevant to Claude Code sessions).
 
     Returns only essential fields (id, description truncated to 80 chars,
-    priority, status, owner, company) for minimal token usage.
+    priority, status, owner, company, project_code) for minimal token usage.
 
     Args:
-        limit: Max tasks to return (default 10).
+        limit: Max total tasks to return across all projects (default 10).
         owner: Filter by owner name (optional).
         priority: Filter by priority: High, Medium, Low (optional).
-        status: Filter by status (optional, defaults to pending + in_progress).
+        status: Filter by status (optional, defaults to all non-complete).
         company: Filter by company name (optional).
+        source: Filter by source (optional).
+        task_type: Filter by task type: issue, dev, manual, enhancement,
+            feature-request (optional). When not set, 'manual' tasks are
+            excluded by default.
 
     Returns:
-        List of compact task dicts sorted by priority (High→Medium→Low) then age.
+        List of compact task dicts grouped by project, sorted by
+        updated_at (newest first) within each project, max 2 per project.
     """
     try:
         client = get_supabase_client()
@@ -454,7 +503,8 @@ def get_task_queue(
             return []
 
         query = client.table("tasks").select(
-            "id, description, priority, status, owner, company, created_at"
+            "id, description, priority, status, owner, company, "
+            "updated_at, project_id, task_type"
         )
 
         # Status filter: default to all non-complete tasks
@@ -462,6 +512,14 @@ def get_task_queue(
             query = query.ilike("status", status)
         else:
             query = query.neq("status", "complete")
+
+        # Task type filter: explicit type, or exclude 'manual' by default.
+        # Manual tasks are physical/in-person actions (e.g., "Cancel hot tub
+        # cleaning service") that are irrelevant to Claude Code work queues.
+        if task_type:
+            query = query.eq("task_type", task_type)
+        else:
+            query = query.neq("task_type", "manual")
 
         if owner:
             query = query.ilike("owner", owner)
@@ -472,24 +530,46 @@ def get_task_queue(
         if source:
             query = query.ilike("source", source)
 
-        # Fetch more than needed, sort in Python by priority then age
-        response = query.order("created_at", desc=False).limit(limit * 3).execute()
+        # Fetch generously — we'll group and cap in Python
+        response = query.order("updated_at", desc=True).limit(200).execute()
         tasks = response.data or []
 
-        # Sort by priority (High=0, Medium=1, Low=2) then age (oldest first)
-        priority_order = {"High": 0, "Medium": 1, "Low": 2}
-        tasks.sort(key=lambda t: (
-            priority_order.get(t.get("priority", "Low"), 3),
-            t.get("created_at", ""),
-        ))
+        # Build project UUID → project_code reverse map
+        id_to_code = _get_project_id_to_code_map()
 
-        # Truncate descriptions and take top N
+        # Group tasks by project_code, keeping top 2 per project
+        # (sorted by updated_at desc — already sorted from DB query)
+        PER_PROJECT = 2
+        groups: dict[str, list[dict]] = {}
         for t in tasks:
-            desc = t.get("description", "")
-            if len(desc) > 80:
-                t["description"] = desc[:77] + "..."
+            project_code = id_to_code.get(t.get("project_id", ""), "unassigned")
+            t["project_code"] = project_code
 
-        return tasks[:limit]
+            if project_code not in groups:
+                groups[project_code] = []
+            if len(groups[project_code]) < PER_PROJECT:
+                groups[project_code].append(t)
+
+        # Flatten groups into a single list, ordered by the most recently
+        # updated task in each group (projects with newest activity first)
+        sorted_groups = sorted(
+            groups.items(),
+            key=lambda g: g[1][0].get("updated_at", "") if g[1] else "",
+            reverse=True,
+        )
+
+        result = []
+        for _project_code, group_tasks in sorted_groups:
+            for t in group_tasks:
+                # Truncate descriptions for compact output
+                desc = t.get("description", "")
+                if len(desc) > 80:
+                    t["description"] = desc[:77] + "..."
+                result.append(t)
+                if len(result) >= limit:
+                    return result
+
+        return result
     except Exception as e:
         logger.error(f"Error fetching task queue: {e}")
         logger.error(f"Traceback:\n{traceback.format_exc()}")

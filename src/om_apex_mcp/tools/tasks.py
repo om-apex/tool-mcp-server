@@ -73,16 +73,17 @@ def register() -> ToolModule:
         ),
         Tool(
             name="get_task_queue",
-            description="Get a compact task listing: id, truncated description (80 chars), priority, status, owner, company. Sorted by priority (High\u2192Medium\u2192Low) then age (oldest first). Default limit 10.",
+            description="Get a compact task listing grouped by project (top 2 per project, most recently updated first). Excludes 'manual' tasks by default. Returns: id, description (80 chars), priority, status, owner, project_code.",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "limit": {"type": "integer", "description": "Max tasks to return (default 10)"},
+                    "limit": {"type": "integer", "description": "Max total tasks to return across all projects (default 10)"},
                     "owner": {"type": "string", "description": "Filter by owner name (optional)"},
                     "priority": {"type": "string", "description": "Filter by priority: High, Medium, Low (optional)"},
                     "status": {"type": "string", "description": "Filter by status: created, assigned-to-claude, notes-prd-unclear, approved-for-prd, prd-to-review, ready-to-plan, planning-in-progress, plan-to-review, ready-to-code, coding-in-progress, ready-for-manual-review, complete (optional, defaults to all non-complete)"},
                     "company": {"type": "string", "description": "Filter by company name (optional)"},
                     "source": {"type": "string", "description": "Filter by source: nishad, user-report, claude-code, sentry, posthog (optional)"},
+                    "task_type": {"type": "string", "description": "Filter by task type: issue, dev, manual, enhancement, feature-request (optional). When omitted, 'manual' tasks are excluded by default."},
                 },
                 "required": [],
             },
@@ -203,17 +204,30 @@ def register() -> ToolModule:
                 status=arguments.get("status"),
                 company=arguments.get("company"),
                 source=arguments.get("source"),
+                task_type=arguments.get("task_type"),
             )
             if not tasks:
                 return [TextContent(type="text", text="Task Queue: No tasks found.")]
-            lines = [f"Task Queue ({len(tasks)} tasks):"]
+
+            # Group output by project_code for readability
+            projects_seen: dict[str, list[str]] = {}
             for t in tasks:
+                project = t.get("project_code", "unassigned")
                 owner_str = f" @{t['owner']}" if t.get("owner") else ""
-                company_str = f" [{t['company']}]" if t.get("company") else ""
-                lines.append(
-                    f"{t['id']} [{t.get('priority', '?')}] ({t.get('status', '?')}) "
-                    f"{t.get('description', '')}{owner_str}{company_str}"
+                line = (
+                    f"  {t['id']} [{t.get('priority', '?')}] ({t.get('status', '?')}) "
+                    f"{t.get('description', '')}{owner_str}"
                 )
+                if project not in projects_seen:
+                    projects_seen[project] = []
+                projects_seen[project].append(line)
+
+            # Build grouped output
+            project_count = len(projects_seen)
+            lines = [f"Task Queue ({len(tasks)} tasks across {project_count} projects):"]
+            for project, task_lines in projects_seen.items():
+                lines.append(f"[{project}]")
+                lines.extend(task_lines)
             return [TextContent(type="text", text="\n".join(lines))]
 
         elif name == "add_task":
