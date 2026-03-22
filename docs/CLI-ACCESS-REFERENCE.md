@@ -227,6 +227,22 @@ for d in json.load(sys.stdin)[:3]:
 ```
 **Workspace:** Om Apex Holdings (`tea-d5smshe3jp1c738d4s9g`)
 
+**Render REST API** (for service updates the CLI can't do):
+```bash
+source ~/om-apex/config/.env.render-api
+
+# Change deploy branch
+curl -s -X PATCH "https://api.render.com/v1/services/<service-id>" \
+  -H "Authorization: Bearer $RENDER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"branch": "production"}'
+
+# Get service details
+curl -s "https://api.render.com/v1/services/<service-id>" \
+  -H "Authorization: Bearer $RENDER_API_KEY"
+```
+API key stored in `~/om-apex/config/.env.render-api`.
+
 **Render auto-deploy:** Works reliably for all services. Pushes to `main` on the linked GitHub repo trigger automatic deploys. Build time is typically 8-10 minutes for AI Quorum backend.
 
 ## Deploy Scripts
