@@ -48,7 +48,7 @@ curl -s -X POST "https://api.supabase.com/v1/projects/<project-ref>/database/que
 supabase migration repair --status applied <version>
 ```
 
-**Known migration history issue (2026-02-27):** AI Quorum has a persistent mismatch on version `20260225` — remote and local both have the version but the CLI doesn't match them (shows on separate rows in `supabase migration list`). This was caused by a migration being applied on one machine and repaired on another. Does not affect operations — just means `supabase db push` may fail. Use the Management API workaround above.
+**Migration history fixed (ISSUE-521, 2026-03-24):** All 101 AI Quorum migrations now use YYYYMMDDHHMMSS format and match local = remote. `supabase db push` works. Always use YYYYMMDDHHMMSS format for new migrations (e.g., `20260324100000_my_change.sql`). The Management API workaround above remains available as a fallback.
 
 **Owner Portal workaround:**
 ```bash
