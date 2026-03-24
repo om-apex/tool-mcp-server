@@ -9,7 +9,7 @@ TASK-505 ready-for-manual-review — ID generation (DEV/ISSUE prefixes) + handof
 ## Deployed State
 - MCP Server: https://om-apex-mcp.onrender.com — live at commit `56ce238`
 - Render Service ID: `srv-d5snc28gjchc73b2se10`
-- 56 tools, 9 modules (handoff module now 2 tools, was 3)
+- 58 tools, 9 modules (tasks module now 10 tools: +advance_task, +get_task_history, +get_schedule)
 
 ## Key Decisions This Session
 - Shared counter across TASK/DEV/ISSUE prefixes (no duplicate numbers)

@@ -14,7 +14,7 @@ Central task tracker for all Om Apex companies.
 | category | TEXT | Technical, Marketing, Legal, Operations, Administrative, Content |
 | company | TEXT | Om Apex Holdings, Om Luxe Properties, Om AI Solutions, Om Supply Chain |
 | priority | TEXT | High, Medium, Low |
-| status | TEXT | `created`, `assigned-to-claude`, `notes-prd-unclear`, `approved-for-prd`, `prd-to-review`, `ready-to-plan`, `planning-in-progress`, `plan-to-review`, `ready-to-code`, `coding-in-progress`, `ready-for-manual-review`, `complete` |
+| status | TEXT | `created`, `assigned-to-claude`, `notes-prd-unclear`, `approved-for-prd`, `prd-to-review`, `ready-to-plan`, `planning-in-progress`, `plan-to-review`, `ready-to-code`, `coding-in-progress`, `ready-for-manual-review`, `user-testing`, `complete` |
 | owner | TEXT | Person name (Nishad, Sumedha, Claude, etc.) |
 | notes | TEXT | Additional notes |
 | project_id | UUID | FK to projects.id — resolved from project_code at creation time |
@@ -32,6 +32,20 @@ Central task tracker for all Om Apex companies.
 | plan_folder | TEXT | Relative path to plan folder, e.g. `docs/tasks/DEV-nnn/` or `docs/tasks/ISSUE-nnn/`. Pre-TASK-504 tasks use `docs/plans/TASK-nnn/` |
 | approved_by | TEXT | Name of approver at most recent approval gate |
 | approved_at | TIMESTAMPTZ | Timestamp of most recent approval gate passage |
+
+### task_status_history
+Audit trail for task status transitions. Recorded by `advance_task` and `update_task_status`.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | BIGSERIAL PK | Auto-increment |
+| task_id | TEXT | FK to tasks.id |
+| from_status | TEXT | Previous status (null for initial) |
+| to_status | TEXT | New status |
+| changed_by | TEXT | Who made the change (e.g., "claude", "nishad") |
+| notes | TEXT | Optional transition notes |
+| duration_minutes | INTEGER | Minutes spent in previous status (computed) |
+| created_at | TIMESTAMPTZ | Auto |
 
 ### decisions
 Technology and business decisions with rationale.

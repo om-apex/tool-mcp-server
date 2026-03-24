@@ -1,6 +1,6 @@
 # Om Apex MCP Server
 
-Model Context Protocol server providing persistent memory and tools across all Claude interfaces. 56 tools across 9 modules.
+Model Context Protocol server providing persistent memory and tools across all Claude interfaces. 58 tools across 9 modules.
 
 ## Architecture
 - **Language:** Python 3.12
@@ -20,14 +20,14 @@ Model Context Protocol server providing persistent memory and tools across all C
 
 Also: Cloudflare API (DNS Sentinel), Google Calendar API, Google Drive (local or API).
 
-## Tool Modules (59 tools)
+## Tool Modules (58 tools)
 
 | Module | File | Tools | Purpose |
 |--------|------|-------|---------|
-| Context | `tools/context.py` | 7 | Company info, tech stack, CLI status |
-| Tasks | `tools/tasks.py` | 7 | Task CRUD via Supabase |
+| Context | `tools/context.py` | 8 | Company info, tech stack, CLI status |
+| Tasks | `tools/tasks.py` | 10 | Task CRUD, advance, history, schedule via Supabase |
 | Progress | `tools/progress.py` | 3 | Session logging to files |
-| Documents | `tools/documents.py` | 11 | Document generation + branding |
+| Documents | `tools/documents.py` | 10 | Document generation + branding |
 | Calendar | `tools/calendar.py` | 3 | Google Calendar API |
 | Handoff | `tools/handoff.py` | 2 | Session handoff history (per-project) |
 | AI Quorum | `tools/ai_quorum.py` | 10 | Quorum product diagnostics |
