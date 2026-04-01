@@ -28,3 +28,8 @@ services:
         value: "https://ixncscosicyjzlopbfiz.supabase.co"
       - key: QUORUM_SUPABASE_SERVICE_KEY
         sync: false
+      # Om Cortex Supabase (for incident tools)
+      - key: CORTEX_SUPABASE_URL
+        value: "https://sgcfettixymowtokytwk.supabase.co"
+      - key: CORTEX_SUPABASE_SERVICE_KEY
+        sync: false
