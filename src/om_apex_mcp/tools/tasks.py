@@ -30,65 +30,113 @@ from ..supabase_client import (
 
 VALID_STATUSES = [
     "created", "assigned-to-claude", "notes-prd-unclear",
-    "approved-for-prd", "prd-to-review", "ready-to-plan",
-    "planning-in-progress", "plan-to-review", "ready-to-code",
-    "coding-in-progress", "ready-for-manual-review",
-    "user-testing", "complete",
+    "researching", "designing", "db-design", "design-review", "design-approval",
+    "planning", "plan-review", "plan-approval",
+    "ready-to-code", "in-development",
+    "coding", "code-review", "testing",
+    "test-results-review", "test-results-approval",
+    "ready-to-deploy", "deploying", "monitoring",
+    "complete",
+    "triaging", "fix-planning", "fix-plan-review", "fix-plan-approval",
 ]
 
 VALID_PRIORITIES = ["Critical", "High", "Medium", "Low"]
 
 VALID_SOURCES = ["nishad", "user-report", "claude-code", "sentry", "posthog"]
 
-# Status transition map: current_status -> list of (next_status, who_can_set)
-STATUS_TRANSITIONS = {
-    "created": [
-        ("assigned-to-claude", "nishad"),
-        ("approved-for-prd", "nishad"),
-        ("planning-in-progress", "claude"),  # Source 2/4/6: issue-fixing takes over
-    ],
-    "assigned-to-claude": [
-        ("coding-in-progress", "claude"),
-        ("notes-prd-unclear", "claude"),
-    ],
-    "notes-prd-unclear": [
-        ("assigned-to-claude", "nishad"),
-        ("approved-for-prd", "nishad"),
-    ],
-    "approved-for-prd": [
-        ("prd-to-review", "claude"),
-    ],
-    "prd-to-review": [
-        ("ready-to-plan", "nishad"),
-    ],
-    "ready-to-plan": [
-        ("planning-in-progress", "claude"),
-    ],
-    "planning-in-progress": [
-        ("plan-to-review", "claude"),
-    ],
-    "plan-to-review": [
-        ("ready-to-code", "nishad"),
-    ],
-    "ready-to-code": [
-        ("coding-in-progress", "claude"),
-    ],
-    "coding-in-progress": [
-        ("ready-for-manual-review", "claude"),
-    ],
-    "ready-for-manual-review": [
-        ("user-testing", "nishad"),
-        ("complete", "nishad"),
-    ],
-    "user-testing": [
-        ("coding-in-progress", "claude"),  # Findings reported
-        ("complete", "nishad"),            # Tests pass
-    ],
-}
+# Cached status progression from DB (loaded on first access)
+_progression_cache: dict | None = None
 
-READING = ["get_pending_tasks", "get_task_queue", "get_task_history", "get_schedule"]
+
+def _get_progression() -> dict:
+    """Load status_progression from DB, cached after first call.
+
+    Returns dict keyed by process_type -> list of steps sorted by step_number.
+    Each step: {step_number, status, agent_role, tool, skippable, required_docs}
+    """
+    global _progression_cache
+    if _progression_cache is not None:
+        return _progression_cache
+
+    client = get_supabase_client()
+    if not client:
+        return {}
+
+    try:
+        result = (client.table("status_progression")
+                  .select("*")
+                  .order("process_type,step_number")
+                  .execute())
+        cache: dict = {}
+        for row in (result.data or []):
+            pt = row["process_type"]
+            if pt not in cache:
+                cache[pt] = []
+            cache[pt].append(row)
+        _progression_cache = cache
+        return cache
+    except Exception:
+        return {}
+
+
+def _get_next_status(process_type: str, current_status: str, skip_statuses: list[str] | None = None) -> dict | None:
+    """Find the next step in the progression for a given process type and current status.
+
+    If skip_statuses is provided, skips those statuses (must be skippable).
+    Returns the step dict or None if no valid next step.
+    """
+    progression = _get_progression().get(process_type, [])
+    if not progression:
+        return None
+
+    # Find current step
+    current_step = None
+    for step in progression:
+        if step["status"] == current_status:
+            current_step = step
+            break
+
+    if current_step is None:
+        return None
+
+    # Find next step (skipping if requested)
+    skip_set = set(skip_statuses or [])
+    for step in progression:
+        if step["step_number"] <= current_step["step_number"]:
+            continue
+        if step["status"] in skip_set:
+            if not step.get("skippable"):
+                return None  # Cannot skip a non-skippable step
+            continue
+        return step
+
+    return None
+
+
+def _get_previous_status(process_type: str, current_status: str, target_status: str) -> dict | None:
+    """Find a previous step for send_back. Target must be earlier in the progression."""
+    progression = _get_progression().get(process_type, [])
+    current_step_num = None
+    target_step = None
+
+    for step in progression:
+        if step["status"] == current_status:
+            current_step_num = step["step_number"]
+        if step["status"] == target_status:
+            target_step = step
+
+    if current_step_num is None or target_step is None:
+        return None
+    if target_step["step_number"] >= current_step_num:
+        return None  # Can only send back to earlier steps
+
+    return target_step
+
+
+READING = ["get_pending_tasks", "get_task_queue", "get_task_history", "get_schedule",
+           "get_subtasks"]
 WRITING = ["add_task", "complete_task", "update_task_status", "update_task",
-           "force_complete", "advance_task"]
+           "force_complete", "advance_task", "send_back"]
 
 
 def _require_supabase() -> None:
