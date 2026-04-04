@@ -79,31 +79,19 @@ class TestTasks:
 class TestModuleRegistration:
     """Test that all tool modules register correctly."""
 
-    def test_all_modules_load(self):
-        """Test that server imports and registers all modules."""
-        from om_apex_mcp.tools import context, tasks, progress, documents
+    def test_remaining_modules_load(self):
+        """Test that remaining modules (post-Cortex migration) register correctly."""
+        from om_apex_mcp.tools import documents
 
-        task_mod = tasks.register()
-        progress_mod = progress.register()
         documents_mod = documents.register()
 
-        all_reading = context.READING + task_mod.reading_tools + progress_mod.reading_tools + documents_mod.reading_tools
-        all_writing = context.WRITING + task_mod.writing_tools + progress_mod.writing_tools + documents_mod.writing_tools
-
-        context_mod = context.register(all_reading, all_writing)
-
         all_tools = []
-        for m in [context_mod, task_mod, progress_mod, documents_mod]:
-            all_tools.extend(t.name for t in m.tools)
+        all_tools.extend(t.name for t in documents_mod.tools)
 
-        # 7 context + 6 tasks + 3 progress + 11 documents = 27
-        assert len(all_tools) == 27
+        # Documents: 10 tools (previously also had context, tasks, progress — migrated to Cortex)
+        assert len(all_tools) == 10
 
         # Spot-check key tools exist
-        assert "get_full_context" in all_tools
-        assert "add_task" in all_tools
-        assert "get_task_queue" in all_tools
-        assert "add_daily_progress" in all_tools
         assert "generate_branded_html" in all_tools
         assert "list_company_configs" in all_tools
 
@@ -243,14 +231,14 @@ class TestAuth:
     """Test authentication module."""
 
     def test_demo_mode_tools_list(self):
-        """Test that demo mode tools are all reading tools."""
+        """Test that demo mode tools are all reading tools (most migrated to Cortex)."""
         from om_apex_mcp.auth import DEMO_MODE_TOOLS
-        assert "get_full_context" in DEMO_MODE_TOOLS
-        assert "get_pending_tasks" in DEMO_MODE_TOOLS
+        assert "list_company_configs" in DEMO_MODE_TOOLS
+        # Migrated tools should no longer be in demo mode
+        assert "get_full_context" not in DEMO_MODE_TOOLS
+        assert "get_pending_tasks" not in DEMO_MODE_TOOLS
         # Writing tools should not be in demo mode
         assert "add_task" not in DEMO_MODE_TOOLS
-        assert "add_decision" not in DEMO_MODE_TOOLS
-        assert "complete_task" not in DEMO_MODE_TOOLS
 
     def test_load_api_keys_empty(self, monkeypatch):
         """Test load_api_keys with no env vars set."""

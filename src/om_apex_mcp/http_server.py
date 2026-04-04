@@ -110,9 +110,10 @@ def create_app() -> Starlette:
 
     Creates separate MCP server instances per tool group:
       /mcp       — all tools (backward compatible)
-      /mcp/core  — core tools only (tasks, progress, calendar, handoff, quorum, incidents, context)
+      /mcp/core  — core tools only (ai_quorum, incidents)
       /mcp/dns   — DNS Sentinel tools only
       /mcp/docs  — document generation tools only
+    Note: tasks, progress, calendar, handoff, context migrated to Om Cortex (DEV-649).
     """
     backend = _create_storage_backend()
 
@@ -145,10 +146,10 @@ def create_app() -> Starlette:
             "storage": _check_storage_health(),
         }
 
-        # Count loaded tool modules
+        # Count loaded tool modules (4 remaining after DEV-649 migration to Cortex)
         try:
-            from .tools import context, tasks, progress, documents, calendar, handoff, ai_quorum, incidents, dns_sentinel
-            modules_loaded = 9  # All 9 tool modules
+            from .tools import documents, ai_quorum, incidents, dns_sentinel
+            modules_loaded = 4
             checks["modules"] = {"status": "ok", "count": modules_loaded}
         except ImportError as e:
             checks["modules"] = {"status": "error", "error": str(e)}

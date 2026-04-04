@@ -36,19 +36,16 @@ customers (demo mode with 13 read-only tools, no API key required).
 - **stdio** (`om-apex-mcp`) — for Claude Desktop
 - **HTTP** (`om-apex-mcp-http`) — for Claude Code, remote access
 
-### 58 Tools Across 9 Modules
+### 32 Tools Across 4 Modules
 
 | Module | File | Tools | Purpose |
 |--------|------|-------|---------|
-| Context | `tools/context.py` | 8 | Company info, tech decisions, CLI status |
-| Tasks | `tools/tasks.py` | 10 | Task CRUD, advance, history, schedule |
-| Progress | `tools/progress.py` | 3 | Session logging to markdown files |
 | Documents | `tools/documents.py` | 10 | Branded document generation |
-| Calendar | `tools/calendar.py` | 3 | Google Calendar API |
-| Handoff | `tools/handoff.py` | 2 | Session handoff history |
 | AI Quorum | `tools/ai_quorum.py` | 10 | Query diagnostics and monitoring |
 | Incidents | `tools/incidents.py` | 2 | Production incident tracking |
 | DNS Sentinel | `tools/dns_sentinel.py` | 10 | DNS audit, auto-heal, change management |
+
+**Migrated to Om Cortex (DEV-649):** Context (8), Tasks (10), Progress (3), Calendar (3), Handoff (2) — 26 tools now served by https://om-cortex.onrender.com/mcp
 
 ### Data Sources
 | Supabase Project | Ref | Used For |
@@ -79,7 +76,7 @@ External: Cloudflare API (DNS), Google Calendar API, Google Drive (documents).
 
 - `src/om_apex_mcp/server.py` — stdio entry point (Claude Desktop)
 - `src/om_apex_mcp/http_server.py` — HTTP entry point (Claude Code)
-- `src/om_apex_mcp/tools/` — 9 tool modules
+- `src/om_apex_mcp/tools/` — 4 active tool modules (5 migrated to Cortex, files kept for rollback)
 - `src/om_apex_mcp/supabase_client.py` — Owner Portal DB client
 - `src/om_apex_mcp/quorum_supabase.py` — AI Quorum DB client
 - `src/om_apex_mcp/cortex_supabase.py` — Om Cortex DB client
@@ -95,11 +92,12 @@ External: Cloudflare API (DNS), Google Calendar API, Google Drive (documents).
    must still work. Never let a single client failure crash the server.
 3. **Demo mode is incomplete** — auth middleware sets `demo_mode` flag but
    `call_tool()` doesn't enforce it. Demo users can call write tools (bug).
-4. **Migration planned** — 28 tools (tasks, handoff, progress, context, incidents)
-   planned for migration to Om Cortex (DEV-632). Documents (10) and DNS (10)
-   stay in MCP server.
+4. **Migration done (DEV-649)** — 26 tools (tasks, handoff, progress, context, calendar)
+   migrated to Om Cortex. Documents (10), DNS (10), Quorum (10), Incidents (2)
+   remain in this MCP server.
 
-## 7. Future: Migration to Om Cortex (DEV-632)
+## 7. Migration to Om Cortex (DEV-632 / DEV-649)
 
-See `products/om-cortex/docs/MCP-TO-CORTEX-MIGRATION.md` for the full plan.
-28 tools move to Cortex as agent skills, 20 remain here (documents + DNS).
+DEV-649 complete: 26 tools (tasks, handoff, progress, context, calendar) removed from
+registration. Module files kept for rollback. Om Cortex serves these as 25 Portal tools
+at https://om-cortex.onrender.com/mcp. 32 tools remain here (documents + DNS + quorum + incidents).

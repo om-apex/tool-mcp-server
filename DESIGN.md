@@ -2,7 +2,7 @@
 
 ## Overview
 
-Model Context Protocol (MCP) server providing persistent memory and tools across all Claude interfaces (Chat, Cowork, Claude Code). 56 tools across 9 modules for managing company context, tasks, decisions, documents, calendar, session handoffs, AI Quorum diagnostics, production incidents, and DNS security.
+Model Context Protocol (MCP) server providing persistent memory and tools across all Claude interfaces (Chat, Cowork, Claude Code). 32 tools across 4 modules for document generation, AI Quorum diagnostics, production incidents, and DNS security. (26 tools migrated to Om Cortex in DEV-649: tasks, handoff, progress, context, calendar.)
 
 ## Tech Stack
 
@@ -30,7 +30,7 @@ mcp-server/
 │   ├── supabase_client.py     # Supabase client (tasks, decisions, handoff)
 │   ├── quorum_supabase.py     # AI Quorum DB integration
 │   ├── cloudflare_client.py   # Cloudflare DNS API client (async, httpx)
-│   └── tools/                 # 9 tool modules
+│   └── tools/                 # 4 active tool modules (5 migrated to Cortex)
 │       ├── __init__.py        # ToolModule dataclass
 │       ├── helpers.py         # Shared utilities, storage init
 │       ├── context.py         # Company context (7 tools)
@@ -66,19 +66,22 @@ mcp-server/
 - `GET /health` — Health check (public, no auth)
 - `POST /mcp/*` — Streamable HTTP MCP endpoint (requires auth)
 
-## Tool Modules (59 tools)
+## Tool Modules (32 active tools)
 
 | Module | Tools | Key Functions |
 |--------|-------|--------------|
-| **Context** (7) | get_full_context, get_company_context, get_technology_decisions, get_domain_inventory, get_cli_status, get_claude_instructions, get_decisions_history | Company info, tech stack, CLI status |
-| **Tasks** (7) | get_pending_tasks, get_task_queue, add_task, complete_task, update_task_status, update_task, force_complete | Task CRUD via Supabase |
-| **Progress** (3) | get_daily_progress, add_daily_progress, search_daily_progress | Session logging to files |
-| **Documents** (11) | generate_branded_html, generate_company_document, view/list/create/update/delete templates, get_brand_assets, list_company_configs, sync_templates | Document generation + branding |
-| **Calendar** (3) | list_calendar_events, create_calendar_event, delete_calendar_event | Google Calendar API |
-| **Handoff** (2) | get_session_handoff, save_session_handoff | Cross-device session state |
+| **Documents** (10) | generate_branded_html, generate_company_document, view/list/create/update/delete templates, get_brand_assets, list_company_configs, sync_templates | Document generation + branding |
 | **AI Quorum** (10) | get_quorum_status, list_quorum_sessions, get_quorum_turn_detail, get_quorum_turn_trace, get_quorum_logs, get_quorum_model_performance, get_quorum_cost_summary, get_quorum_stage_config, update_quorum_stage_config, get_quorum_user_detail | Diagnostics for AI Quorum product |
 | **Incidents** (2) | incident_create, incident_list | Production incident tracking (Om Cortex Supabase) |
 | **DNS Sentinel** (10) | dns_snapshot, dns_audit, dns_heal, dns_approve, dns_reject, dns_view_config, dns_view_approvals, dns_view_changes, dns_view_snapshot, dns_update_config | DNS audit, auto-heal, and change management for all 21 Cloudflare domains |
+
+### Migrated to Om Cortex (DEV-649)
+The following modules are no longer registered (files kept for rollback):
+- **Context** (8) — get_full_context, get_company_context, get_technology_decisions, get_domain_inventory, get_cli_status, get_claude_instructions, get_decisions_history, add_decision
+- **Tasks** (10) — get_pending_tasks, get_task_queue, add_task, complete_task, update_task_status, update_task, force_complete, advance_task, get_task_history, get_schedule
+- **Progress** (3) — get_daily_progress, add_daily_progress, search_daily_progress
+- **Calendar** (3) — list_calendar_events, create_calendar_event, delete_calendar_event
+- **Handoff** (2) — get_handoff_history, save_session_handoff
 
 ## Storage Backends
 
@@ -114,8 +117,8 @@ Used for: production incident tracking (prodsupport_incidents)
 
 | Level | Access | Mechanism |
 |-------|--------|-----------|
-| Full | All 59 tools | `X-API-Key` header with valid key |
-| Demo | 13 read-only tools | `OM_APEX_DEMO_MODE=true`, no key |
+| Full | All 32 tools | `X-API-Key` header with valid key |
+| Demo | 1 read-only tool | `OM_APEX_DEMO_MODE=true`, no key |
 | None | 401 error | No key, demo disabled |
 
 ## Tool Registration

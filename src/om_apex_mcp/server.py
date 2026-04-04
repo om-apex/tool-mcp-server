@@ -42,7 +42,7 @@ try:
     from .storage import StorageBackend, LocalStorage
     from .tools import ToolModule
     from .tools.helpers import init_storage
-    from .tools import context, tasks, progress, documents, calendar, handoff, ai_quorum, incidents, dns_sentinel
+    from .tools import documents, ai_quorum, incidents, dns_sentinel
 except ImportError as e:
     logger.critical(f"Failed to import local modules: {e}")
     logger.critical(f"Traceback:\n{traceback.format_exc()}")
@@ -50,7 +50,9 @@ except ImportError as e:
 
 
 # Module group definitions for selective loading
-_CORE_MODULES = frozenset({"tasks", "progress", "calendar", "handoff", "ai_quorum", "incidents", "context"})
+# NOTE: tasks, progress, calendar, handoff, and context modules migrated to Om Cortex (DEV-649).
+# Their registration is removed here; module files kept for git history / rollback.
+_CORE_MODULES = frozenset({"ai_quorum", "incidents"})
 _DNS_MODULES = frozenset({"dns_sentinel"})
 _DOCS_MODULES = frozenset({"documents"})
 _ALL_MODULES = _CORE_MODULES | _DNS_MODULES | _DOCS_MODULES
@@ -98,27 +100,8 @@ def create_server(backend: Optional[StorageBackend] = None, group: Optional[str]
         raise RuntimeError(f"Cannot create MCP Server: {e}") from e
 
     # Phase 3: Register tool modules (filtered by group)
+    # NOTE: tasks, progress, calendar, handoff, context migrated to Om Cortex (DEV-649)
     modules: list[ToolModule] = []
-    _task_mod = _progress_mod = _documents_mod = _calendar_mod = None
-    _handoff_mod = _quorum_mod = _incidents_mod = _dns_sentinel_mod = None
-
-    if "tasks" in allowed:
-        try:
-            _task_mod = tasks.register()
-            modules.append(_task_mod)
-            logger.info(f"Tasks module loaded ({len(_task_mod.tools)} tools)")
-        except Exception as e:
-            logger.error(f"Failed to load tasks module: {e}")
-            logger.error(f"Traceback:\n{traceback.format_exc()}")
-
-    if "progress" in allowed:
-        try:
-            _progress_mod = progress.register()
-            modules.append(_progress_mod)
-            logger.info(f"Progress module loaded ({len(_progress_mod.tools)} tools)")
-        except Exception as e:
-            logger.error(f"Failed to load progress module: {e}")
-            logger.error(f"Traceback:\n{traceback.format_exc()}")
 
     if "documents" in allowed:
         try:
@@ -127,24 +110,6 @@ def create_server(backend: Optional[StorageBackend] = None, group: Optional[str]
             logger.info(f"Documents module loaded ({len(_documents_mod.tools)} tools)")
         except Exception as e:
             logger.error(f"Failed to load documents module: {e}")
-            logger.error(f"Traceback:\n{traceback.format_exc()}")
-
-    if "calendar" in allowed:
-        try:
-            _calendar_mod = calendar.register()
-            modules.append(_calendar_mod)
-            logger.info(f"Calendar module loaded ({len(_calendar_mod.tools)} tools)")
-        except Exception as e:
-            logger.error(f"Failed to load calendar module: {e}")
-            logger.error(f"Traceback:\n{traceback.format_exc()}")
-
-    if "handoff" in allowed:
-        try:
-            _handoff_mod = handoff.register()
-            modules.append(_handoff_mod)
-            logger.info(f"Handoff module loaded ({len(_handoff_mod.tools)} tools)")
-        except Exception as e:
-            logger.error(f"Failed to load handoff module: {e}")
             logger.error(f"Traceback:\n{traceback.format_exc()}")
 
     if "ai_quorum" in allowed:
@@ -174,29 +139,10 @@ def create_server(backend: Optional[StorageBackend] = None, group: Optional[str]
             logger.error(f"Failed to load DNS Sentinel module: {e}")
             logger.error(f"Traceback:\n{traceback.format_exc()}")
 
-    # Phase 4: Build tool lists and register context module (core + all groups only)
-    if "context" in allowed:
-        try:
-            _all_reading = context.READING.copy()
-            _all_writing = context.WRITING.copy()
-
-            for mod in [_task_mod, _progress_mod, _documents_mod, _calendar_mod,
-                        _handoff_mod, _quorum_mod, _incidents_mod, _dns_sentinel_mod]:
-                if mod:
-                    _all_reading += mod.reading_tools
-                    _all_writing += mod.writing_tools
-
-            _context_mod = context.register(_all_reading, _all_writing)
-            modules.insert(0, _context_mod)  # Context module first
-            logger.info(f"Context module loaded ({len(_context_mod.tools)} tools)")
-        except Exception as e:
-            logger.error(f"Failed to load context module: {e}")
-            logger.error(f"Traceback:\n{traceback.format_exc()}")
-
     total_tools = sum(len(m.tools) for m in modules)
     logger.info(f"Total modules loaded: {len(modules)}, Total tools: {total_tools}")
 
-    # Phase 5: Register server handlers
+    # Phase 4: Register server handlers
     @server.list_tools()
     async def list_tools() -> list[Tool]:
         """Return list of available tools."""

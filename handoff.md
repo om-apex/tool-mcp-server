@@ -1,20 +1,20 @@
 # Handoff — MCP Server
 
 ## Current State
-TASK-505 ready-for-manual-review — ID generation (DEV/ISSUE prefixes) + handoff refactor complete and deployed.
+DEV-649 in progress — removing migrated tool modules (tasks, handoff, progress, context, calendar) from registration. Module files kept for rollback.
 
 ## Last Session
-2026-03-17 — Executed TASK-505: rewrote `get_next_task_id(task_type)` with shared counter, dropped `session_handoff` singleton table, simplified save to INSERT-only, removed `get_session_handoff` tool, added required `project_code` to save/history tools. Migration pushed to Owner Portal Supabase. Deployed to Render and verified e2e.
+2026-04-04 — DEV-649: Removed registration of 5 migrated modules (26 tools) from server.py and http_server.py. These tools now live in Om Cortex at https://om-cortex.onrender.com/mcp. Updated auth.py demo mode tools, CLAUDE.md, DESIGN.md, and tests. 32 tools remain across 4 modules (documents, ai_quorum, incidents, dns_sentinel).
 
 ## Deployed State
-- MCP Server: https://om-apex-mcp.onrender.com — live at commit `56ce238`
+- MCP Server: https://om-apex-mcp.onrender.com
 - Render Service ID: `srv-d5snc28gjchc73b2se10`
-- 58 tools, 9 modules (tasks module now 10 tools: +advance_task, +get_task_history, +get_schedule)
+- 32 tools, 4 modules (documents, ai_quorum, incidents, dns_sentinel)
 
 ## Key Decisions This Session
-- Shared counter across TASK/DEV/ISSUE prefixes (no duplicate numbers)
-- `project_code` is required on both `save_session_handoff` and `get_handoff_history`
-- Existing TASK-nnn IDs grandfathered (no migration of old IDs)
+- Module files NOT deleted (kept for git history and rollback)
+- `/mcp/core` endpoint now serves only ai_quorum + incidents
+- Demo mode reduced to 1 tool (list_company_configs) — most demo tools were in migrated modules
 
 ## Blockers
 None.

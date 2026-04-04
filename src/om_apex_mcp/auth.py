@@ -17,19 +17,10 @@ from starlette.responses import Response
 logger = logging.getLogger("om-apex-mcp")
 
 # Reading-only tools allowed in demo mode
+# NOTE: Most demo tools migrated to Om Cortex (DEV-649).
+# Only document-related read tools remain here.
 DEMO_MODE_TOOLS = [
-    "get_full_context",
-    "get_claude_instructions",
-    "get_company_context",
-    "get_technology_decisions",
-    "get_decisions_history",
-    "get_domain_inventory",
-    "get_pending_tasks",
-    "get_task_queue",
-    "get_daily_progress",
-    "search_daily_progress",
     "list_company_configs",
-    "get_handoff_history",
 ]
 
 
