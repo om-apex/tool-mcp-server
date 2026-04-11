@@ -6,6 +6,22 @@ This playbook covers all Om Apex products and services. It defines the branch st
 
 ---
 
+## When This Playbook Must Be Updated
+
+Update this file (and commit to `tool-mcp-server`) whenever any of the following change:
+
+- A new service is added (new Render service, Vercel project, or Supabase project)
+- A service's deploy branch changes (e.g. `main` → `production`)
+- A service is renamed, moved, or decommissioned
+- A new required env var is identified (especially one that silently breaks things when missing)
+- An OAuth callback URL is registered or changed
+- A repo is renamed in GitHub
+- The branch strategy changes for any product
+
+**Who updates it:** the agent who makes the change. Docs are concurrent with code — not deferred.
+
+---
+
 ## Core Rules
 
 1. **Branch strategy is universal** — `main` → staging, `main` → `production` → production. No exceptions.
@@ -19,13 +35,23 @@ This playbook covers all Om Apex products and services. It defines the branch st
 
 ## Branch Strategy
 
+### AI Quorum and Render-style services
+
 ```
 main ──────────────────────────────────────────► staging auto-deploys
   │
   └─── merge main→production ──────────────────► production auto-deploys
 ```
 
-Applies to: all Render backend services, all Vercel frontend projects, `tool-docx-service`.
+Applies to: AI Quorum backend (Render), AI Quorum frontend (Vercel), `tool-docx-service`, Om Cortex, MCP Server.
+
+### Websites and Owner Portal
+
+```
+main ──────────────────────────────────────────► production auto-deploys (no staging)
+```
+
+Applies to: `website-apex`, `website-ai-solutions`, `website-supply-chain`, `website-luxe-properties`, `website-portal`. These repos deploy directly from `main` — there is no staging branch or staging environment.
 
 ---
 
@@ -59,7 +85,7 @@ Applies to: all Render backend services, all Vercel frontend projects, `tool-doc
 
 | Service | URL | Platform | Service/Project ID | Repo | Branch | Health/Verification |
 |---------|-----|----------|--------------------|------|--------|---------------------|
-| Frontend | `portal.omapex.com` | Vercel | — | `om-apex/owner-portal` | `main` | Load page |
+| Frontend | `portal.omapex.com` | Vercel | — | `om-apex/website-portal` | `main` | Load page |
 | Supabase | — | Supabase | `hympgocuivzxzxllgmcy` | — | — | Supabase dashboard |
 
 ### Om Cortex
