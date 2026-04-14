@@ -117,6 +117,18 @@ Missing any of these silently breaks DOCX/PDF export:
 | `GOTENBERG_URL` | `https://om-gotenberg.onrender.com` | `https://ai-quorum-gotenberg-prod.onrender.com` |
 | `GOTENBERG_TIMEOUT_SECONDS` | `120` | `120` |
 
+### AI Quorum Backend (build-time)
+
+Set in the Render dashboard for **both** backend services (staging `srv-d60m0r63jp1c73a8fthg`, production `srv-d7cnpbv7f7vs73c955bg`). If missing, the build fails at `pip install` for private `om-docx`. Use **Generate token** in the UI — do **not** use `PUT /env-vars` (full replace).
+
+| Variable | Purpose | Notes |
+|----------|---------|-------|
+| `GITHUB_TOKEN` | Fine-grained PAT for `pip install` of private `om-docx` | **Read-only**, repository scope: **`om-apex/tool-om-docx`** only. Recommended name: `render-om-docx-readonly`. Mark as **secret**. Rotate before expiry — metadata in `~/om-apex/config/README.md` (not the secret). |
+
+**Build command** (if not already set): from repo `backend/` directory, `chmod +x render-build.sh && ./render-build.sh` (or rely on `backend/render.yaml` if the service uses Blueprint sync).
+
+**GitHub Actions (`product-ai-quorum` CI):** add repository secret `TOOL_OM_DOCX_READONLY_TOKEN` with the same fine-grained PAT (or a second PAT with identical scope). Backend `ci.yml` uses it to `pip install` `om-docx` before `requirements.txt`.
+
 **Verify env vars (Render API):**
 ```bash
 source ~/om-apex/config/.env.render-api
@@ -147,6 +159,7 @@ curl -s -H "Authorization: Bearer $RENDER_API_KEY" \
 
 ### Backend change (Render — any service)
 - [ ] Code committed and pushed to `main`
+- [ ] **AI Quorum backend only:** `GITHUB_TOKEN` present on staging and production (build-time) — see [AI Quorum Backend (build-time)](#ai-quorum-backend-build-time)
 - [ ] For production: `main` merged to `production` branch and pushed
 - [ ] Render shows deploy `live` with your commit message — verify via API:
   ```bash
@@ -228,6 +241,41 @@ curl -s -X POST -H "Authorization: Bearer $RENDER_API_KEY" \
 - **om-docx-service:** Revert the commit in `tool-docx-service`, merge to `production` branch, push. Render auto-deploys the reverted version.
 - **DNS (post-cutover):** Revert Cloudflare CNAME to previous Vercel URL. Propagates within ~60 seconds.
 - **Do not delete OAuth records** during a UI rollback unless token corruption is confirmed.
+
+---
+
+## Production Cutover Criteria — AI Quorum
+
+**Context:** AI Quorum has two environments: staging (`staging.aiquorum.ai` / `product-ai-quorum.onrender.com`) and production (`aiquorum.ai` / `ai-quorum-backend-prod.onrender.com`). Both deploy from the same repo. The cutover is when production becomes the primary user-facing environment and staging reverts to dev/test only.
+
+**All items must be complete before cutover:**
+
+### Must-have (blocking)
+- [ ] **DEV-760** — PDF pipeline (browser print-to-PDF + HTML Chromium for email) deployed and verified on both environments
+- [ ] **DEV-739** — Rich DOCX styling complete and verified
+- [ ] **DEV-1** — UX/UI cleanup task delivered
+- [ ] **Landing page video** — Codex's 1-minute product video plugged into the landing page
+- [ ] **ISSUE-756 / ISSUE-755** — Sentry PDF conversion errors resolved (should auto-resolve with DEV-760)
+- [ ] **ISSUE-741** — `ModuleNotFoundError` Sentry error resolved
+- [ ] **ISSUE-671** — Stripe webhook SDK v15 compatibility verified (billing must work)
+- [ ] **Supabase migration parity** — both Supabase projects (`ixncscosicyjzlopbfiz` staging, `mljvfepuhgwogoeolhrd` production) have identical schema
+- [ ] **Stripe/billing end-to-end** — verified on production Supabase
+- [ ] **DNS/SSL** — `aiquorum.ai` serving correctly via Cloudflare → Vercel
+
+### Should-have (quality bar)
+- [ ] **DEV-683** — S5 Synthesizer prompt enhancement (affects report quality)
+- [ ] **ISSUE-543** — Countdown clock sizing fix
+- [ ] **Sentry clean baseline** — zero unresolved errors on production backend
+- [ ] **Env var parity** — all required env vars verified on production backend (DOCX_SERVICE_URL, GOTENBERG_URL, GOTENBERG_TIMEOUT_SECONDS, FRONTEND_URL, etc.)
+
+### Cutover steps (when all criteria met)
+1. Final `main` → `production` merge and push (both Render + Vercel deploy)
+2. Apply any pending Supabase migrations to production project
+3. Verify health checks on both backends
+4. Verify Render API shows correct commit on production
+5. Smoke test: submit a query, verify pipeline, export PDF + DOCX, check email
+6. Monitor Sentry for 24 hours post-cutover
+7. Update DNS Sentinel config if any records changed
 
 ---
 
