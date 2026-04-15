@@ -258,15 +258,16 @@ curl -s -X POST -H "Authorization: Bearer $RENDER_API_KEY" \
 - [ ] **ISSUE-756 / ISSUE-755** — Sentry PDF conversion errors resolved (should auto-resolve with DEV-760)
 - [ ] **ISSUE-741** — `ModuleNotFoundError` Sentry error resolved
 - [ ] **ISSUE-671** — Stripe webhook SDK v15 compatibility verified (billing must work)
-- [ ] **Supabase migration parity** — both Supabase projects (`ixncscosicyjzlopbfiz` staging, `mljvfepuhgwogoeolhrd` production) have identical schema
+- [x] **Supabase migration parity** — both Supabase projects (`ixncscosicyjzlopbfiz` staging, `mljvfepuhgwogoeolhrd` production) have identical schema. Done 2026-04-14 (ISSUE-771); see `products/ai-quorum/docs/tasks/ISSUE-771/TEST-01.md`. One known reverse drift documented: `handle_new_user` auth trigger function exists on prod only — left in place. Re-verify with the parity diff right before cutover.
 - [ ] **Stripe/billing end-to-end** — verified on production Supabase
 - [ ] **DNS/SSL** — `aiquorum.ai` serving correctly via Cloudflare → Vercel
+- [x] **DEV-696** — Email delivery logging deployed and verified on both environments (2026-04-15). New `email_send_log` table on staging+prod Supabase. `send_email()` writes one row per attempt with sendgrid_message_id captured from X-Message-ID. All 13 call sites pass `template`+`caller` kwargs; the 12 silent/partially-silent ones now surface failures honestly (HTML red card on beta admin GET form, JSON `email_sent`+`email_log_id` on POST endpoints, HTTP 502 on report_email failures). New admin endpoint `GET /api/v2/admin/email-log?recipient=&status=&template=&limit=` for diagnostic queries. E2E smoke test verified: live SendGrid send + log row landed on both Supabase projects with real X-Message-IDs. See `products/ai-quorum/docs/tasks/DEV-696/TEST-01.md`.
 
 ### Should-have (quality bar)
 - [ ] **DEV-683** — S5 Synthesizer prompt enhancement (affects report quality)
 - [ ] **ISSUE-543** — Countdown clock sizing fix
-- [ ] **Sentry clean baseline** — zero unresolved errors on production backend
-- [ ] **Env var parity** — all required env vars verified on production backend (DOCX_SERVICE_URL, GOTENBERG_URL, GOTENBERG_TIMEOUT_SECONDS, FRONTEND_URL, etc.)
+- [x] **Sentry clean baseline** — zero unresolved errors on production backend. Done 2026-04-14: mass-resolved 518 → 0 unresolved on `ai-quorum-backend` (env=production, 14d) via Sentry API as a pre-cutover baseline reset. Frontend project was already 0/0. Real bugs surfaced during triage filed as follow-ups (ISSUE-775). Re-verify the day of cutover with: `curl -i -H "Authorization: Bearer $SENTRY_AIQUORUM_TOKEN" "https://sentry.io/api/0/projects/om-apex-holdings/ai-quorum-backend/issues/?query=is%3Aunresolved+environment%3Aproduction&statsPeriod=14d&limit=1" | grep x-hits` — should return `x-hits: 0`.
+- [x] **Env var parity** — verified on production backend Render service (`srv-d7cnpbv7f7vs73c955bg`) on 2026-04-14. All 4 playbook-required vars present: `DOCX_SERVICE_URL=https://om-docx-service.onrender.com`, `GOTENBERG_URL=https://ai-quorum-gotenberg-prod.onrender.com`, `GOTENBERG_TIMEOUT_SECONDS=120`, `FRONTEND_URL=https://aiquorum.ai`. Per-env values (Supabase URLs/keys, Gotenberg URL, ADMIN_API_KEY) correctly differ. Staging-side fix: added `GOTENBERG_TIMEOUT_SECONDS=120` to `srv-d60m0r63jp1c73a8fthg` for parity. **One drift to address before cutover:** prod `CORS_ORIGINS` includes a deployment-specific Vercel preview URL (`ai-quorum-prod-4jb4tekb2-nishad-tambes-projects.vercel.app`) that will become stale on every Vercel redeploy. Recommended fix: replace with `https://aiquorum.ai` only. Staging `CORS_ORIGINS` also incorrectly lists `https://aiquorum.ai` (staging shouldn't accept that origin) — recommended cleanup at the same time.
 
 ### Cutover steps (when all criteria met)
 1. Final `main` → `production` merge and push (both Render + Vercel deploy)
